@@ -54,7 +54,7 @@ final class Database
             $dsn .= ';sslmode=' . $parametros['sslmode'];
         }
 
-        return new PDO(
+        $pdo = new PDO(
             $dsn,
             rawurldecode($partes['user']),
             rawurldecode($partes['pass'] ?? ''),
@@ -64,5 +64,10 @@ final class Database
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             ]
         );
+
+        // CURRENT_DATE y CURRENT_TIMESTAMP en hora de Madrid, como el resto de la aplicación (Reloj).
+        $pdo->prepare("SELECT set_config('TimeZone', ?, false)")->execute([Reloj::ZONA_HORARIA]);
+
+        return $pdo;
     }
 }

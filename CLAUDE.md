@@ -48,6 +48,7 @@ El proyecto se construye en **fases cerradas**. Una fase solo termina cuando pas
 - **Entorno de producción:** contenedor Docker (`php:8.3-apache`) en Render con PostgreSQL en Neon. El `Dockerfile` se crea en la Fase 9 y se valida con el build de Render.
 - **Idioma:** nombres de clases, métodos, variables, tablas y mensajes en español, como en el análisis (`ValidadorVisita`, `desplazamiento_min`). Comentarios en español, breves y solo donde aporten.
 - **Mantenibilidad:** la persona que mantendrá el código conoce HTML, CSS, JS, PHP y MySQL. Prioriza código simple y explícito frente a abstracciones. Una clase, una responsabilidad.
+- **Zona horaria:** `Europe/Madrid` siempre, sea cual sea la del servidor. La hora actual sale de `App\Reloj`, y `Database` fija la misma zona en cada conexión de PostgreSQL (`CURRENT_DATE`, marcas de tiempo).
 - **Constantes de negocio** en un único lugar (`src/Reglas.php`): `JORNADA_INICIO = 480`, `JORNADA_FIN = 1020`, `DESPLAZAMIENTO_MINIMO = 30`, `DESPLAZAMIENTO_MAXIMO = 240`, `DURACION_MINIMA = 15`, `DURACION_MAXIMA = 540`. Los puntos R1 y R2 del análisis (misma obra y salida desde la sede) están pendientes de decisión: implementa el comportamiento actual (mínimo de 30 siempre) de forma que cambiarlo afecte a un solo método.
 
 ### Comandos estándar

@@ -84,7 +84,7 @@ final class ValidadorVisita
             $obraId = null;
         }
 
-        if (!$this->esFechaValida($datos['fecha'] ?? null)) {
+        if (!self::esFechaValida($datos['fecha'] ?? null)) {
             $errores[] = new ErrorRegla(ErrorRegla::CAMPOS, 'La fecha no es válida (formato AAAA-MM-DD)', 'fecha');
         }
 
@@ -245,7 +245,8 @@ final class ValidadorVisita
         return [$anterior, null];
     }
 
-    private function esFechaValida(mixed $fecha): bool
+    /** Fecha real con formato AAAA-MM-DD. Pública para que el servicio no consulte la base con fechas imposibles. */
+    public static function esFechaValida(mixed $fecha): bool
     {
         return is_string($fecha)
             && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/D', $fecha, $partes) === 1
