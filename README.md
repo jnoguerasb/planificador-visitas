@@ -2,7 +2,7 @@
 
 Aplicación web para planificar las visitas de los técnicos a las obras. PHP 8.3 sin framework, PostgreSQL 16 y JavaScript vanilla.
 
-> Estado: **Fase 6** (interfaz del planificador: login, nueva visita con previsualización, agenda, listado y cancelación). La guía de trabajo está en `CLAUDE.md` y el análisis funcional en `docs/analisis.md`.
+> Estado: **Fase 7** (interfaces del planificador y del técnico completas). La guía de trabajo está en `CLAUDE.md` y el análisis funcional en `docs/analisis.md`.
 
 ## Requisitos (Windows)
 

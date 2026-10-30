@@ -4,6 +4,7 @@
 import { fijarToken, get, post } from './api.js';
 import { porId } from './dom.js';
 import { iniciarLogin, mostrarLogin } from './login.js';
+import { iniciarMiAgenda } from './mi-agenda.js';
 import { iniciarPlanificacion } from './planificacion.js';
 
 const VISTAS = ['vista-login', 'vista-planificacion', 'vista-mi-agenda'];
@@ -37,7 +38,7 @@ function entrar({ usuario, csrf }) {
         iniciarPlanificacion();
     } else {
         porId('vista-mi-agenda').hidden = false;
-        porId('agenda-tecnico').textContent = 'La vista del técnico llega en la Fase 7.';
+        iniciarMiAgenda();
     }
 }
 

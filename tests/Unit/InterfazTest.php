@@ -17,6 +17,7 @@ use PHPUnit\Framework\TestCase;
 final class InterfazTest extends TestCase
 {
     private const PUBLICA = __DIR__ . '/../../public';
+    private const ENLACE_MAPA = 'https://www.openstreetmap.org/search?query=';
 
     public function testElHtmlNoLlevaCodigoNiEstilosEnLinea(): void
     {
@@ -62,10 +63,18 @@ final class InterfazTest extends TestCase
         }
     }
 
+    /**
+     * Ninguna URL externa en el JavaScript, salvo los enlaces que abre el usuario (no son recursos
+     * que cargue la página): el buscador de OpenStreetMap para ver la dirección de una obra.
+     */
     #[DataProvider('archivosJs')]
     public function testNingunModuloCargaRecursosDeOtrosDominios(string $archivo): void
     {
-        self::assertSame(0, preg_match('#https?://#i', $this->leer($archivo)), "{$archivo} no debe usar URLs externas");
+        preg_match_all('#https?://[^\s\'"`]*#i', $this->leer($archivo), $urls);
+
+        foreach ($urls[0] as $url) {
+            self::assertSame(self::ENLACE_MAPA, $url, "{$archivo} no debe usar URLs externas");
+        }
     }
 
     public function testLaHojaDeEstilosNoCargaRecursosDeOtrosDominios(): void
