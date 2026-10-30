@@ -1,7 +1,8 @@
-﻿# Arranca el servidor de desarrollo en http://localhost:8080 sirviendo solo public/.
-# Uso: .\scripts\servidor.ps1 [-Puerto 8081]   (Ctrl+C para pararlo)
+﻿# Arranca el servidor de desarrollo en http://localhost:8081 sirviendo solo public/.
+# Uso: .\scripts\servidor.ps1 [-Puerto 8082]   (Ctrl+C para pararlo)
+# El 8080 no se usa porque en el equipo de desarrollo lo ocupa otro programa.
 
-param([ValidateRange(1024, 65535)][int]$Puerto = 8080)
+param([ValidateRange(1024, 65535)][int]$Puerto = 8081)
 
 . (Join-Path $PSScriptRoot 'entorno.ps1')
 

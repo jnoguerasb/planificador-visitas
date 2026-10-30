@@ -40,9 +40,10 @@ El proyecto se construye en **fases cerradas**. Una fase solo termina cuando pas
 - **Entorno de desarrollo: local en Windows, sin Docker.** El equipo de desarrollo no permite virtualización (ni Docker Desktop ni WSL2). Por eso, y esto prevalece sobre la sección 7 del análisis:
   - PHP 8.3 portable en `C:\php83`, independiente del PHP 8.1 de XAMPP, que no se toca. Extensiones: `pdo_pgsql`, `curl`, `mbstring`, `openssl`, `zip`.
   - PostgreSQL 16 instalado como servicio de Windows en `localhost:5432`. La base `planificador` es para desarrollo y `planificador_test` para tests; ambas se crean con `scripts/crear_bases.ps1`.
-  - Servidor de desarrollo `php -S localhost:8080 -t public` con `display_errors=0`, lanzado por `scripts/servidor.ps1`. No se usa el Apache de XAMPP.
+  - Servidor de desarrollo `php -S localhost:8081 -t public` con `display_errors=0`, lanzado por `scripts/servidor.ps1`. No se usa el Apache de XAMPP. El puerto es 8081 porque el 8080 lo ocupa otro programa del equipo (MiniTool ShadowMaker).
   - `scripts/entorno.ps1` (se carga con `. .\scripts\entorno.ps1`) antepone `C:\php83`, el `bin` de PostgreSQL y `C:\Program Files\Git\bin` al `PATH` **solo en la sesión actual** y carga las variables de `.env`. Sin librerías de terceros.
-  - Los tests de integración usan la variable `DATABASE_URL_TEST`, nunca `DATABASE_URL`.
+  - Dos usuarios de base de datos: `app_planificador` (aplicación, `DATABASE_URL`) y `planificador_admin` (propietario de las bases, migraciones y seed, `DATABASE_ADMIN_URL`). Ninguno es superusuario. Los crea `scripts/crear_bases.ps1` con las contraseñas de `.env`.
+  - Los tests de integración usan `DATABASE_URL_TEST` y `DATABASE_ADMIN_URL_TEST`, nunca las de desarrollo, y se niegan a ejecutarse si la base no acaba en `_test`.
   - Finales de línea LF forzados con `.gitattributes`, para que el código funcione igual en el contenedor Linux de producción.
 - **Entorno de producción:** contenedor Docker (`php:8.3-apache`) en Render con PostgreSQL en Neon. El `Dockerfile` se crea en la Fase 9 y se valida con el build de Render.
 - **Idioma:** nombres de clases, métodos, variables, tablas y mensajes en español, como en el análisis (`ValidadorVisita`, `desplazamiento_min`). Comentarios en español, breves y solo donde aporten.
@@ -73,7 +74,7 @@ Texto completo en la sección 11 de `docs/analisis.md`. En este proyecto se conc
 4. **CSRF:** token `bin2hex(random_bytes(32))` en sesión, enviado en la cabecera `X-CSRF-Token`, comparado con `hash_equals`, en **todos** los POST (incluido el login). Ningún GET cambia estado.
 5. **Sesión:** cookie `Secure`, `HttpOnly`, `SameSite=Strict` en todos los entornos; `session.use_strict_mode=1`; solo el id de sesión en la cookie; `session_regenerate_id(true)` al autenticar; caducidad por 30 min de inactividad y 8 h máximas; logout con `session_destroy()` y borrado de cookie.
 6. **Autorización:** el router tiene una tabla ruta → roles permitidos y **deniega por defecto**. `Permisos` comprueba además la propiedad de la visita. Mínimo privilegio.
-7. **Secretos:** `password_hash(PASSWORD_DEFAULT)` / `password_verify`. Ningún secreto en el código ni en el repositorio: `DATABASE_URL`, `DEMO_PASSWORD`, `APP_ENV` solo por variables de entorno. `.env` en `.gitignore`; `.env.example` sin valores reales.
+7. **Secretos:** `password_hash(PASSWORD_DEFAULT)` / `password_verify`. Ningún secreto en el código ni en el repositorio: `DATABASE_URL`, `DATABASE_ADMIN_URL` (y sus `_TEST`), `DEMO_PASSWORD`, `APP_ENV` solo por variables de entorno. `.env` en `.gitignore`; `.env.example` sin valores reales.
 8. **SSRF:** la aplicación no hace peticiones salientes. No añadas ninguna.
 9. **Archivos:** sin subida de archivos. El router no traduce rutas a ficheros. El servidor web sirve solo `public/` (Apache en producción, `php -S ... -t public` en desarrollo).
 10. **Errores:** `display_errors=Off`. Manejador global: detalle a `error_log`, respuesta 500 con `{"errores":[{"regla":"INTERNO","mensaje":"Ha ocurrido un error. Inténtalo de nuevo."}]}`. Login siempre con "Usuario o contraseña incorrectos".
@@ -112,17 +113,17 @@ Tareas:
 - Estructura de carpetas de la sección 7 del análisis (vacía salvo lo necesario), con `tests/Unit`, `tests/Integration`, `tests/Api` y `tests/Support`.
 - `scripts/entorno.ps1`: PATH de sesión y carga de `.env` (apartado 2); falla con mensaje claro si falta PHP 8.3, PostgreSQL o `.env`.
 - `scripts/crear_bases.ps1`: crea `planificador` y `planificador_test` si no existen (idempotente), con el superusuario cuya contraseña se pide por consola o viene de `.env`; nunca escrita en el script.
-- `scripts/servidor.ps1`: `php -d display_errors=0 -S localhost:8080 -t public`.
+- `scripts/servidor.ps1`: `php -d display_errors=0 -S localhost:8081 -t public` (puerto cambiable con `-Puerto`).
 - `composer.json` con `"php": "^8.3"`, PHPUnit 11, autoload y los scripts del apartado 2.
 - `phpunit.xml` con las suites `unit`, `integration`, `api` y `failOnRisky`, `failOnWarning`, `failOnEmptyTestSuite=false`.
 - `scripts/check-security.sh` completo desde ahora.
-- `.gitignore` (`.env`, `vendor/`, `coverage/`), `.env.example` con nombres de variables (`DATABASE_URL`, `DATABASE_URL_TEST`, `DEMO_PASSWORD`, `APP_ENV`, `PG_BIN`) y valores de ejemplo no reales.
+- `.gitignore` (`.env`, `vendor/`, `coverage/`), `.env.example` con nombres de variables (`DATABASE_URL`, `DATABASE_URL_TEST`, `DATABASE_ADMIN_URL`, `DATABASE_ADMIN_URL_TEST`, `DEMO_PASSWORD`, `APP_ENV`, `PG_BIN`) y valores de ejemplo no reales.
 - `README.md` mínimo con los requisitos y el arranque en Windows.
 - Un test trivial `tests/Unit/EntornoTest.php` que compruebe que PHP es 8.3 y que `pdo_pgsql` está cargado.
 
 Criterios de aceptación:
 - Desde un clon limpio: `. .\scripts\entorno.ps1`, `composer install`, `.\scripts\crear_bases.ps1` y `composer verify` pasan.
-- Con `.\scripts\servidor.ps1` en marcha, `http://localhost:8080` responde (aunque sea una página provisional).
+- Con `.\scripts\servidor.ps1` en marcha, `http://localhost:8081` responde (aunque sea una página provisional).
 - `check-security.sh` falla si se añade a propósito un `innerHTML` a un JS de prueba (demostrarlo y revertirlo).
 
 Validación manual: el usuario clona el repo en otra carpeta, sigue solo el README y comprueba que arranca.
