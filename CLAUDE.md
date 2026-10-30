@@ -72,7 +72,7 @@ Texto completo en la sección 11 de `docs/analisis.md`. En este proyecto se conc
 1. **Entradas:** toda entrada externa es no confiable. Se valida siempre en servidor (tipo, formato, longitud, rango, lista blanca). Lo que no cumple se **rechaza**; el servidor nunca corrige valores. Campos no esperados en el JSON se rechazan.
 2. **Base de datos:** solo sentencias preparadas, `PDO::ATTR_EMULATE_PREPARES = false`, `PDO::ERRMODE_EXCEPTION`. Prohibido concatenar datos en SQL. El usuario de la aplicación (`app_planificador`) solo tiene `SELECT`, `INSERT`, `UPDATE`; las migraciones se ejecutan con otro usuario.
 3. **XSS:** en JS solo `textContent`, `createElement`, `setAttribute` con valores controlados. Prohibidos `innerHTML`, `outerHTML`, `insertAdjacentHTML`, `document.write`, `eval`, `new Function` con datos. Cabecera `Content-Security-Policy: default-src 'self'`.
-4. **CSRF:** token `bin2hex(random_bytes(32))` en sesión, enviado en la cabecera `X-CSRF-Token`, comparado con `hash_equals`, en **todos** los POST (incluido el login). Ningún GET cambia estado.
+4. **CSRF:** token `bin2hex(random_bytes(32))` en sesión, enviado en la cabecera `X-CSRF-Token`, comparado con `hash_equals`, en **todos** los POST **salvo el login**. El token se genera al iniciar sesión y se devuelve en la respuesta del login. Excepción aprobada por el usuario el 30/10/2026 (motivo en la sección 11.4 del análisis). El login lo compensa así: solo acepta `Content-Type: application/json` (una web ajena no puede enviarlo sin CORS, que no se habilita), rechaza con 403 una cabecera `Origin` de otro sitio y la cookie es `SameSite=Strict`. Ningún GET cambia estado.
 5. **Sesión:** cookie `Secure`, `HttpOnly`, `SameSite=Strict` en todos los entornos; `session.use_strict_mode=1`; solo el id de sesión en la cookie; `session_regenerate_id(true)` al autenticar; caducidad por 30 min de inactividad y 8 h máximas; logout con `session_destroy()` y borrado de cookie.
 6. **Autorización:** el router tiene una tabla ruta → roles permitidos y **deniega por defecto**. `Permisos` comprueba además la propiedad de la visita. Mínimo privilegio.
 7. **Secretos:** `password_hash(PASSWORD_DEFAULT)` / `password_verify`. Ningún secreto en el código ni en el repositorio: `DATABASE_URL`, `DATABASE_ADMIN_URL` (y sus `_TEST`), `DEMO_PASSWORD`, `APP_ENV` solo por variables de entorno. `.env` en `.gitignore`; `.env.example` sin valores reales.
@@ -204,18 +204,21 @@ Criterios de aceptación: suites `unit` e `integration` en verde.
 
 Clases y archivos: `Auth` (login, sesión, caducidad, logout, usuario actual), `Csrf`, `Entrada` (lectura y validación estricta del JSON), `Respuesta` (JSON, cabeceras de seguridad), `ManejadorErrores`, `public/index.php` con la tabla de rutas → roles y denegación por defecto.
 
-Endpoints de esta fase: `POST /api/login`, `POST /api/logout`, `GET /api/yo`, y una ruta de comprobación interna solo para tests si hace falta (eliminarla antes de cerrar la fase).
+Endpoints de esta fase: `POST /api/login` (sin token CSRF, devuelve el token nuevo), `POST /api/logout`, `GET /api/yo`. Sin rutas solo para tests.
+
+JSON mal formado o `Content-Type` distinto de `application/json`: **400** con la regla `CAMPOS`. Datos legibles pero no válidos: 422.
 
 Cabeceras en todas las respuestas: `Content-Security-Policy: default-src 'self'`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`, `X-Frame-Options: DENY`.
 
 Tests:
-- `unit`: `Csrf` (token válido, ausente, alterado), `Entrada` (campos extra, tipos, JSON mal formado).
+- `unit`: `Csrf` (token válido, ausente, alterado), `Entrada` (campos extra, tipos, JSON mal formado), `ManejadorErrores` (una excepción con rutas o SQL en su mensaje produce un 500 con el mensaje genérico, sin esos detalles en el cuerpo, y el detalle va al registro; sin forzar errores en el servidor).
 - `api` (servidor `php -S localhost:8099 -t public` arrancado por la clase base con `DATABASE_URL` de test; usar el host `localhost` para que el cliente acepte la cookie `Secure`):
-  - login correcto: 200, cookie con `Secure`, `HttpOnly`, `SameSite=Strict`, id de sesión distinto al previo;
+  - login correcto sin token CSRF: 200, devuelve un token, cookie con `Secure`, `HttpOnly`, `SameSite=Strict`, id de sesión distinto al previo;
+  - login con `Origin` de otro sitio: 403; con `Content-Type` que no es JSON: 400;
   - login incorrecto con email existente y con email inexistente: mismo 401 y mismo mensaje;
-  - POST sin token CSRF: 403;
+  - POST con sesión pero sin token CSRF o con token alterado (logout): 403;
   - `GET /api/yo` sin sesión: 401; tras logout: 401;
-  - error forzado: 500 con el mensaje genérico, sin rutas ni SQL en el cuerpo.
+  - cabeceras de seguridad presentes en todas las respuestas, también en las de error; ruta inexistente: 404.
 
 Criterios de aceptación: todas las suites en verde; `check:security` en verde.
 

@@ -346,7 +346,7 @@ Respuesta de `GET /api/agenda` (resumida):
 
 Un hueco es el tiempo no ocupado por ninguna visita activa ni por el desplazamiento que la precede (09:00 − 40 min = 08:20). Los errores siguen el formato `{"errores": [{"regla", "mensaje"}]}` en todos los endpoints.
 
-**Seguridad.** Contraseñas con `password_hash` / `password_verify`; sesión PHP con cookie `HttpOnly`, `SameSite=Strict` y `Secure` en todos los entornos; caducidad por inactividad y destrucción de la sesión al salir; `session_regenerate_id()` al entrar; token CSRF en cabecera para todas las peticiones POST; sentencias preparadas de PDO; salida con `textContent`, nunca `innerHTML` con datos.
+**Seguridad.** Contraseñas con `password_hash` / `password_verify`; sesión PHP con cookie `HttpOnly`, `SameSite=Strict` y `Secure` en todos los entornos; caducidad por inactividad y destrucción de la sesión al salir; `session_regenerate_id()` al entrar; token CSRF en cabecera para todas las peticiones POST salvo el login (ver 11.4); sentencias preparadas de PDO; salida con `textContent`, nunca `innerHTML` con datos.
 
 ## 7. Arquitectura y estructura del repositorio
 
@@ -538,6 +538,7 @@ La funcionalidad opcional propuesta en la primera versión (agenda diaria del t�
 - Festivos, vacaciones y jornadas distintas por técnico.
 - Notificar al planificador cuando un técnico cancela (email o aviso en pantalla).
 - Paginación del listado y exportación a CSV.
+- Límite de intentos de login contra fuerza bruta. Propuesta estudiada: 5 fallos seguidos en 15 min bloquean ese email 15 min (también si el email no existe, para no revelar qué cuentas hay); contador en una tabla nueva `intentos_login` con `INSERT ... ON CONFLICT DO UPDATE`; respuesta 429 con un código de regla nuevo. Riesgo a valorar: cualquiera que conozca un email puede bloquear esa cuenta 15 min.
 
 ## 11. Premisas obligatorias de seguridad para el desarrollo
 
@@ -567,6 +568,13 @@ Las siguientes premisas deberán aplicarse a todo el código generado o modifica
 - Toda petición que cree, modifique o elimine información deberá estar protegida mediante **token anti-CSRF validado en servidor**.
 - Las peticiones `GET` no deberán realizar cambios de estado.
 - Los tokens deberán ser aleatorios, criptográficamente seguros y estar vinculados a la sesión.
+
+**Excepción aprobada en este proyecto (30/10/2026): el login no exige token.** Antes de entrar no hay sesión ni token, y exigirlo obligaba a una petición previa solo para obtenerlo. El login no crea ni modifica datos de negocio: el riesgo que queda es el *login CSRF* (que una web ajena haga entrar al navegador de la víctima con la cuenta del atacante). Se compensa así:
+
+- El login solo acepta `Content-Type: application/json`. Una web ajena no puede enviar ese tipo a otro dominio sin una comprobación CORS previa, y el servidor no habilita CORS.
+- Si la petición trae cabecera `Origin` de otro sitio, se rechaza con 403.
+- La cookie de sesión es `SameSite=Strict` y el id de sesión se regenera al entrar.
+- El token se genera al iniciar sesión, se devuelve en la respuesta del login y se exige en todos los demás POST.
 
 ### 11.5 Cookies y sesiones
 
@@ -614,13 +622,13 @@ Las siguientes premisas deberán aplicarse a todo el código generado o modifica
 
 | Premisa | Cómo se aplica | Cómo se verifica |
 | --- | --- | --- |
-| 11.1 Entradas | `ValidadorVisita` y una clase `Entrada` comprueban en servidor: ids enteros con `filter_var`, fecha `Y-m-d` estricta con `DateTime::createFromFormat`, hora `HH:MM` por expresión regular, duración 15–540, desplazamiento 30–240 (por debajo, "El desplazamiento mínimo es 30 min"), comentario 10–2.000 caracteres, motivo 5–500, estado y rol por lista blanca. Cualquier campo no esperado en el JSON se rechaza | Tests de `CAMPOS` y prueba con `curl` saltándose el formulario |
+| 11.1 Entradas | `ValidadorVisita` y una clase `Entrada` comprueban en servidor: ids enteros con `filter_var`, fecha `Y-m-d` estricta con `DateTime::createFromFormat`, hora `HH:MM` por expresión regular, duración 15–540, desplazamiento 30–240 (por debajo, "El desplazamiento mínimo es 30 min"), comentario 10–2.000 caracteres, motivo 5–2.000, estado y rol por lista blanca. Cualquier campo no esperado en el JSON se rechaza | Tests de `CAMPOS` y prueba con `curl` saltándose el formulario |
 | 11.2 Base de datos | Solo PDO con sentencias preparadas y `PDO::ATTR_EMULATE_PREPARES = false`. El usuario de la aplicación solo tiene `SELECT`, `INSERT` y `UPDATE` sobre las tablas; sin `DELETE` (nada se borra) ni permisos de esquema. Las migraciones se ejecutan con otro usuario | Revisión: búsqueda de concatenaciones en SQL (`grep`); `GRANT` documentado en `001_esquema.sql` |
 | 11.3 XSS | Todo dato se pinta con `textContent` y `createElement`; nunca `innerHTML` con datos ni `eval()`. Cabecera `Content-Security-Policy: default-src 'self'` como segunda barrera | Completar una visita con `<script>` en el comentario y comprobar que se ve como texto |
-| 11.4 CSRF | Token `bin2hex(random_bytes(32))` guardado en la sesión, enviado en la cabecera `X-CSRF-Token` y comparado con `hash_equals`. Aplica a todos los POST, también al login. Ningún GET cambia datos | Test 30: POST sin token devuelve 403 |
+| 11.4 CSRF | Token `bin2hex(random_bytes(32))` generado al iniciar sesión, guardado en la sesión, enviado en la cabecera `X-CSRF-Token` y comparado con `hash_equals`. Aplica a todos los POST salvo el login (excepción de 11.4, compensada con `Content-Type: application/json` obligatorio, rechazo de `Origin` ajeno y `SameSite=Strict`). Ningún GET cambia datos | Test 30: POST sin token devuelve 403; login con `Origin` ajeno devuelve 403 |
 | 11.5 Sesiones | `session_set_cookie_params` con `Secure`, `HttpOnly` y `SameSite=Strict` en todos los entornos (los navegadores aceptan `Secure` en `http://localhost`). `session.use_strict_mode=1`. En la cookie solo va el id de sesión. `session_regenerate_id(true)` al entrar. Caducidad por 30 min de inactividad y 8 h máximas. Al salir, `session_destroy()` y borrado de la cookie | Inspeccionar la cookie en el navegador; volver atrás tras cerrar sesión |
 | 11.6 Autorización | El router tiene una tabla ruta → roles permitidos y deniega por defecto. `Permisos` comprueba además la propiedad de la visita. El técnico solo tiene acceso a lo suyo | Tests 25–27 |
 | 11.7 Secretos | `password_hash()` con `PASSWORD_DEFAULT` y `password_verify()`. `DATABASE_URL` y `DEMO_PASSWORD` solo en variables de entorno; `.env` en `.gitignore` | Revisión del repositorio antes de publicarlo |
 | 11.8 SSRF | La aplicación no hace ninguna petición saliente. Si en el futuro se integra una API de mapas, solo se llamará a un host fijo por `https`, configurado en servidor | No aplica en esta versión |
 | 11.9 Archivos | No hay subida de archivos. El router no traduce rutas a ficheros; Apache solo sirve `public/` y el código de `src/` queda fuera de la raíz web | Pedir `/../src/Auth.php` y comprobar 404 |
-| 11.10 Errores | `display_errors=Off`. Un manejador global registra el detalle con `error_log` y responde 500 con `{"errores":[{"regla":"INTERNO","mensaje":"Ha ocurrido un error. Inténtalo de nuevo."}]}`. El login responde siempre "Usuario o contraseña incorrectos", sin revelar si el email existe | Provocar un error de BD y comprobar la respuesta |
+| 11.10 Errores | `display_errors=Off`. Un manejador global registra el detalle con `error_log` y responde 500 con `{"errores":[{"regla":"INTERNO","mensaje":"Ha ocurrido un error. Inténtalo de nuevo."}]}`. El login responde siempre "Usuario o contraseña incorrectos", sin revelar si el email existe | Test unitario de `ManejadorErrores`: una excepción con rutas o SQL produce el 500 genérico sin esos detalles |

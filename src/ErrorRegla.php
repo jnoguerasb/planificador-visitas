@@ -15,6 +15,9 @@ final readonly class ErrorRegla
     public const ESTADO = 'ESTADO';
     public const MOMENTO = 'MOMENTO';
     public const TEXTO = 'TEXTO';
+    // Fuera de la tabla de reglas del análisis: rutas o visitas que no existen (404) y errores internos (500).
+    public const NO_ENCONTRADO = 'NO_ENCONTRADO';
+    public const INTERNO = 'INTERNO';
 
     public function __construct(
         public string $regla,

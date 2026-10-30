@@ -28,6 +28,25 @@ final class UsuarioRepository
         return $fila === false ? null : $fila;
     }
 
+    /**
+     * Lo que el navegador necesita saber del usuario: email, rol y técnico asociado (con su nombre).
+     *
+     * @return array{id: int, email: string, rol: string, tecnico_id: ?int, tecnico: ?string}|null
+     */
+    public function perfil(int $id): ?array
+    {
+        $sentencia = $this->pdo->prepare(<<<'SQL'
+            SELECT u.id, u.email, u.rol, u.tecnico_id, t.nombre AS tecnico
+              FROM usuarios u
+              LEFT JOIN tecnicos t ON t.id = u.tecnico_id
+             WHERE u.id = ? AND u.activo
+            SQL);
+        $sentencia->execute([$id]);
+        $fila = $sentencia->fetch();
+
+        return $fila === false ? null : $fila;
+    }
+
     /** Usuario de la sesión. Un usuario desactivado deja de existir para la aplicación. */
     public function buscarActivoPorId(int $id): ?Usuario
     {
