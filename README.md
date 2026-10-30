@@ -116,3 +116,11 @@ Enviar '/visitas/6/cancelar' @{ motivo = 'Prueba de permisos' } $token
 
 Remove-Item $cookies
 ```
+
+## Despliegue (Render + Neon)
+
+La aplicación se publica como contenedor Docker (`php:8.3-apache`) en Render, con la base de datos en Neon. Archivos: `Dockerfile`, `docker/` (Apache, PHP y script de arranque), `render.yaml` y `.dockerignore`. Ninguno contiene secretos: `DATABASE_URL` y `DEMO_PASSWORD` se introducen en el panel de Render.
+
+Los pasos completos (crear la base y los usuarios en Neon, subir el repositorio a GitHub, crear el servicio en Render y comprobarlo) están en **[docs/guia-despliegue.md](docs/guia-despliegue.md)**, junto con la lista de diferencias entre desarrollo y producción.
+
+> **Arranque en frío:** en el plan gratuito, Render suspende el servicio tras 15 minutos sin uso y Neon también duerme la base. La primera petición después puede tardar 30–60 segundos; las siguientes son rápidas.

@@ -6,7 +6,7 @@ Esta guía es para la persona que despliega. Claude Code prepara los archivos (`
 | --- | --- | --- |
 | A. Base de datos en Neon | Ya | 20–30 min |
 | B. Repositorio privado en GitHub | Ya | 5–10 min |
-| C. Servicio web en Render | Cuando Claude Code avise de que el `Dockerfile` está listo | 15–20 min (+ 5–10 min del primer build) |
+| C. Servicio web en Render | Ya: `Dockerfile` y `render.yaml` están en el repositorio (haz `git push` antes) | 15–20 min (+ 5–10 min del primer build) |
 | D. Comprobaciones finales | Después de C | 10–15 min |
 
 Resultado final:
@@ -124,9 +124,9 @@ Más adelante, cuando Claude Code termine las fases que quedan, bastará con `gi
 
 ---
 
-## Parte C. Servicio web en Render (cuando el `Dockerfile` esté listo)
+## Parte C. Servicio web en Render
 
-Claude Code avisará cuando `Dockerfile` y `render.yaml` estén en el repositorio. Antes, haz `git push`.
+`Dockerfile` y `render.yaml` ya están en el repositorio. Antes de empezar, haz `git push` para que GitHub tenga la última versión.
 
 **C1.** Entra en <https://render.com> y regístrate **con GitHub**.
 
@@ -184,4 +184,22 @@ El paso 2 del bloque debe dar `HTTP 422` con "El desplazamiento mínimo es 30 mi
 
 ## Diferencias entre desarrollo y producción
 
-Claude Code completará esta sección en la Fase 9, revisando punto por punto: mayúsculas en las rutas, finales de línea, cabeceras en los archivos estáticos, cookie `Secure` detrás del proxy de Render, variables de entorno en Apache, registro de errores…
+En desarrollo se usa Windows con `php -S`; en producción, Linux con Apache. Esta tabla repasa cada diferencia y cómo está cubierta:
+
+| Aspecto | Desarrollo (Windows) | Producción (Render, Linux) | Cómo está cubierto |
+| --- | --- | --- | --- |
+| Mayúsculas en rutas y archivos | Windows no las distingue | Linux sí | Todas las rutas de la API van en minúsculas. `InterfazTest` comprueba que cada archivo del HTML y cada `import` de JS existe con las mayúsculas exactas. Las clases PHP se cargan con un mapa generado en el build (`--classmap-authoritative`) a partir de los archivos reales |
+| Finales de línea | Git fija LF en todo salvo los `.ps1` | Un script con CRLF no arranca | `.gitattributes`; `DespliegueTest` comprueba que no hay CR en `Dockerfile` ni en `docker/` |
+| Servidor web | `php -S`: sirve los archivos de `public/` y manda el resto a `index.php` | Apache + `mod_rewrite`: lo mismo con `RewriteCond !-f` | El router es el mismo `public/index.php`. Solo `public/` es accesible en los dos |
+| Cabeceras de seguridad | Las pone PHP; los archivos estáticos (JS, CSS) salen sin ellas | Apache las pone en todo (`Header always set`) y quita la copia de PHP para que no se dupliquen | Comprobación D3 de esta guía |
+| Rutas que acaban en `.php` (`/src/Auth.php`) | `php -S` responde su propio 404 | Pasan al router, que da 404 JSON con cabeceras | En ninguno de los dos se sirve código |
+| Cookie `Secure` | Los navegadores la aceptan en `http://localhost` | Render termina el HTTPS y reenvía en HTTP al contenedor | La cookie se marca `Secure` siempre, sin intentar detectar HTTPS, así que el proxy no la afecta |
+| Control de `Origin` en los POST | Compara con el `Host` de `localhost:8081` | El proxy de Render conserva el `Host` público | Igual en los dos. Si el login diera 403 en producción, este sería el primer sitio a revisar |
+| Variables de entorno | `.env` cargado por `entorno.ps1` | Panel de Render; Apache las hereda del contenedor y PHP las lee con `getenv` | `.env` no entra en la imagen (`.dockerignore`) ni en git |
+| Errores | `display_errors=0`; el detalle va a la consola de `php -S` | `display_errors=Off`; el detalle va a los *Logs* de Render, sin argumentos de funciones en las trazas | Al cliente solo le llega el mensaje genérico (test de `ManejadorErrores`) |
+| Zona horaria | Europe/Madrid (`Reloj`, conexión de PostgreSQL) | Render funciona en UTC | La aplicación fija Europe/Madrid en PHP y en cada conexión, sin depender del servidor |
+| Base de datos | PostgreSQL 16 local, sin TLS | Neon (PostgreSQL 16) con `sslmode=require`, host directo | Mismo esquema y mismos dos usuarios. Sin *pooler*: la zona horaria se fija por conexión |
+| Usuarios demo | `recrear_bd.ps1` | El contenedor ejecuta `crear_usuarios_demo.php` al arrancar | El script es idempotente; si falla, Apache arranca igualmente y se registra un aviso |
+| Sesiones | Archivos en la carpeta temporal | Archivos en `/tmp` del contenedor | Se pierden al redesplegar o al reiniciar el contenedor: hay que volver a entrar. Aceptable para la demo |
+| Dependencias | PHPUnit y pcov | Solo el autoload (`--no-dev`), sin pcov ni Xdebug | `DespliegueTest` |
+| Arranque en frío | Inmediato | 30–60 s tras 15 min sin uso (plan gratuito de Render y Neon) | Avisado en el README y en esta guía |

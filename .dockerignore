@@ -1,0 +1,12 @@
+# Nada de esto entra en la imagen: secretos locales, dependencias de desarrollo, tests y documentación.
+.git
+.env
+.env.*
+vendor
+tests
+coverage
+.phpunit.cache
+docs
+scripts
+*.md
+phpunit.xml

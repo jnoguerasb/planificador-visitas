@@ -1,0 +1,19 @@
+# Blueprint de Render: un servicio web con Docker. Sin secretos: DATABASE_URL y DEMO_PASSWORD
+# se piden al crear el servicio (sync: false) y se guardan solo en el panel de Render.
+services:
+  - type: web
+    name: planificador-visitas
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DEMO_PASSWORD
+        sync: false
