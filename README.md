@@ -2,7 +2,13 @@
 
 Aplicación web para planificar las visitas de los técnicos a las obras. PHP 8.3 sin framework, PostgreSQL 16 y JavaScript vanilla.
 
-> Estado: **Fase 7** (interfaces del planificador y del técnico completas). La guía de trabajo está en `CLAUDE.md` y el análisis funcional en `docs/analisis.md`.
+> Estado: **fases 0–9 desarrolladas**; pendientes la validación manual de las interfaces y la publicación en Render. Decisiones, supuestos y pendientes: [`DECISIONES.md`](DECISIONES.md). Análisis funcional: `docs/analisis.md`. Guía de trabajo: `CLAUDE.md`.
+
+## Qué hace
+
+- **Planificador** (`planificador@demo.local`): programa visitas viendo la agenda del técnico. La visita propuesta aparece en verde si cabe y en rojo si choca, antes de guardar. También filtra el listado y cancela visitas con motivo.
+- **Técnico** (`ana@demo.local`…): ve su agenda día a día y completa (con comentario) o cancela (con motivo) sus visitas.
+- Reglas: sin solapes, dentro de la jornada de 08:00 a 17:00, y con tiempo para desplazarse desde la sede o desde la visita anterior (mínimo 30 min) y hasta la siguiente.
 
 ## Requisitos (Windows)
 
@@ -19,7 +25,13 @@ Para medir la cobertura de los tests (opcional): copia `php_pcov.dll` de [pcov 1
 
 Si PowerShell no deja ejecutar scripts, ejecuta una vez: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
 
-## Arranque
+## Arranque (menos de 10 minutos con los requisitos instalados)
+
+En `.env` (copiado de `.env.example`) pon:
+
+- **Dos contraseñas que elijas**: una para `app_planificador` y otra para `planificador_admin`. Cada una va en su URL y en la URL `_TEST` correspondiente. `crear_bases.ps1` crea los usuarios con ellas.
+- Una `DEMO_PASSWORD` para los usuarios demo.
+- `PG_BIN`, si PostgreSQL no está en la carpeta por defecto.
 
 En PowerShell, desde la carpeta del proyecto:
 
