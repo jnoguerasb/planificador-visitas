@@ -29,6 +29,8 @@ El proyecto se construye en **fases cerradas**. Una fase solo termina cuando pas
    - Dudas o riesgos abiertos.
 6. **Para y espera.** Después del informe, no empieces la siguiente fase hasta que el usuario responda explícitamente "OK fase N".
 7. **Cierre de fase tras la aprobación:** un commit con mensaje `fase N: <resumen>` y una etiqueta `git tag fase-N`. Nunca hagas commit de una fase no aprobada.
+> **Cambio aprobado por el usuario el 30/10/2026 para las fases 6, 7, 8 y la parte de Claude Code de la 9:** se desarrollan seguidas, sin parar entre ellas. En cada fase se sigue ejecutando la puerta automática (`composer verify` y los criterios automatizables) y se hace un commit `fase N: <resumen>`, pero **sin etiqueta**. Las validaciones manuales de todas ellas se hacen juntas al final; las etiquetas `fase-N` se ponen cuando el usuario las aprueba. Mientras tanto, el usuario avanza con su parte de la Fase 9 siguiendo `docs/guia-despliegue.md`.
+
 8. **Una fase aprobada no se reabre en silencio.** Si una fase posterior obliga a cambiar código de una anterior, avisa, explica el motivo y vuelve a pasar los tests de todas las fases.
 
 ## 2. Stack y convenciones
