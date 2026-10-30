@@ -36,7 +36,7 @@ El proyecto se construye en **fases cerradas**. Una fase solo termina cuando pas
 - **Backend:** PHP 8.3 sin framework, PDO, `declare(strict_types=1);` en todos los archivos, autoload PSR-4 con Composer (`App\` → `src/`).
 - **Base de datos:** PostgreSQL 16. SQL estándar y portable a MySQL cuando sea posible (ver sección 5 del análisis).
 - **Frontend:** HTML, CSS y JavaScript vanilla, sin build ni dependencias.
-- **Tests:** PHPUnit 11 (única dependencia de desarrollo). Cobertura con `pcov` en el PHP local (si no hay DLL para Windows, Xdebug solo en modo `coverage`; se decide en la Fase 2).
+- **Tests:** PHPUnit 11 (única dependencia de desarrollo). Cobertura con `pcov` 1.0.12 (DLL de PECL para PHP 8.3 NTS x64) en `C:\php83\ext`, cargado con `pcov.enabled=0` y activado solo al medir: `php -d pcov.enabled=1 vendor/bin/phpunit --testsuite unit --coverage-text`.
 - **Entorno de desarrollo: local en Windows, sin Docker.** El equipo de desarrollo no permite virtualización (ni Docker Desktop ni WSL2). Por eso, y esto prevalece sobre la sección 7 del análisis:
   - PHP 8.3 portable en `C:\php83`, independiente del PHP 8.1 de XAMPP, que no se toca. Extensiones: `pdo_pgsql`, `curl`, `mbstring`, `openssl`, `zip`.
   - PostgreSQL 16 instalado como servicio de Windows en `localhost:5432`. La base `planificador` es para desarrollo y `planificador_test` para tests; ambas se crean con `scripts/crear_bases.ps1`.

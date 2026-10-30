@@ -2,7 +2,7 @@
 
 Aplicación web para planificar las visitas de los técnicos a las obras. PHP 8.3 sin framework, PostgreSQL 16 y JavaScript vanilla.
 
-> Estado: **Fase 1** (base de datos y datos de ejemplo). La guía de trabajo está en `CLAUDE.md` y el análisis funcional en `docs/analisis.md`.
+> Estado: **Fase 2** (reglas de negocio en clases puras, con tests). La guía de trabajo está en `CLAUDE.md` y el análisis funcional en `docs/analisis.md`.
 
 ## Requisitos (Windows)
 
@@ -14,6 +14,8 @@ Aplicación web para planificar las visitas de los técnicos a las obras. PHP 8.
 | Git for Windows | cualquiera reciente (incluye `bash`) | https://git-scm.com |
 
 En `C:\php83\php.ini` deben estar activadas las extensiones `curl`, `mbstring`, `openssl`, `pdo_pgsql` y `zip`, y `display_errors = Off`.
+
+Para medir la cobertura de los tests (opcional): copia `php_pcov.dll` de [pcov 1.0.12 para PHP 8.3 NTS x64](https://downloads.php.net/~windows/pecl/releases/pcov/1.0.12/) en `C:\php83\ext` y añade al `php.ini` `extension=pcov` y `pcov.enabled=0`.
 
 Si PowerShell no deja ejecutar scripts, ejecuta una vez: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
 
@@ -62,3 +64,5 @@ Contraseña: la de `DEMO_PASSWORD` en tu `.env`.
 | `composer test` | Las tres suites |
 | `composer check:security` | `scripts/check-security.sh` |
 | `composer verify` | Todo lo anterior. Es la puerta mínima de cada fase |
+
+Cobertura de la suite `unit` (requiere `pcov`): `php -d pcov.enabled=1 vendor/bin/phpunit --testsuite unit --coverage-text`. Lista legible de los tests: `php vendor/bin/phpunit --testsuite unit --testdox`.

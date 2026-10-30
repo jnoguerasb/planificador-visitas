@@ -503,7 +503,7 @@ Con las ampliaciones el trabajo sube de unas 3 horas a unas **6 horas**. El orde
 | Completadas | Siguen ocupando su horario | Ocurrieron de verdad |
 | Cancelar | Planificador o técnico dueño, motivo obligatorio para ambos | Trazabilidad uniforme |
 | Estados finales | Completada y Cancelada no se reactivan ni editan | Historial limpio; reprogramar = visita nueva |
-| Duración | 15–540 min; desplazamiento 30–240 min | Jornada completa y un máximo razonable |
+| Duración | 15–540 min; desplazamiento 30–240 min. Mientras siga R2, una visita de 540 min no cabe (máximo real 510): se mantiene 540 como límite del campo | Jornada completa y un máximo razonable; si R2 cambia, 540 vuelve a caber sin tocar nada |
 | Fechas pasadas y fines de semana | Se permiten al programar | El enunciado no los restringe |
 | Errores | Se devuelven todos a la vez | Se corrige en un solo intento |
 | Datos maestros | Técnicos, obras, sede y usuarios solo por script | El foco son las reglas y los perfiles |
@@ -515,7 +515,7 @@ Dos consecuencias del desplazamiento mínimo de 30 que hay que confirmar con neg
 | Id | Punto | Comportamiento en esta versión | Por qué revisarlo | Alternativa | Afecta a |
 | --- | --- | --- | --- | --- | --- |
 | R1 | Visitas seguidas en la **misma obra** | Exigen 30 min entre ellas | El enunciado solo exige los 30 min entre obras diferentes. Esta versión es más estricta y rechaza casos que el enunciado permite; un evaluador puede probarlo | Si la visita anterior o la siguiente es en la misma obra, desplazamiento 0 | Sección 4 ejemplo 9; test 4 |
-| R2 | Primera visita del día, **desde la sede** | Mínimo 30 min: ninguna visita puede empezar antes de las 08:30 | Una obra cercana a la sede podría necesitar menos tiempo y perder media hora de jornada cada día | Permitir desde la sede un valor menor (0–29) sin ajuste, o un tiempo fijo por obra | Sección 4 ejemplo 8; tests 15 y 16 |
+| R2 | Primera visita del día, **desde la sede** | Mínimo 30 min: ninguna visita puede empezar antes de las 08:30 | Una obra cercana a la sede podría necesitar menos tiempo y perder media hora de jornada cada día. Además, con este mínimo una visita de 540 min (la duración máxima) nunca cabe: el máximo real es 510 | Permitir desde la sede un valor menor (0–29) sin ajuste, o un tiempo fijo por obra | Sección 4 ejemplo 8; tests 15 y 16; duración máxima útil |
 
 ### La agenda ya no es opcional
 
