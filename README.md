@@ -2,7 +2,7 @@
 
 Aplicación web para planificar las visitas de los técnicos a las obras. PHP 8.3 sin framework, PostgreSQL 16 y JavaScript vanilla.
 
-> Estado: **Fase 4** (seguridad transversal: login, sesión, CSRF, cabeceras y router con `POST /api/login`, `POST /api/logout` y `GET /api/yo`). La guía de trabajo está en `CLAUDE.md` y el análisis funcional en `docs/analisis.md`.
+> Estado: **Fase 5** (API de negocio completa, protegida por sesión, roles y CSRF). La guía de trabajo está en `CLAUDE.md` y el análisis funcional en `docs/analisis.md`.
 
 ## Requisitos (Windows)
 
@@ -66,3 +66,52 @@ Contraseña: la de `DEMO_PASSWORD` en tu `.env`.
 | `composer verify` | Todo lo anterior. Es la puerta mínima de cada fase |
 
 Cobertura de la suite `unit` (requiere `pcov`): `php -d pcov.enabled=1 vendor/bin/phpunit --testsuite unit --coverage-text`. Lista legible de los tests: `php vendor/bin/phpunit --testsuite unit --testdox`.
+
+## API
+
+Todas las respuestas son JSON. Los errores tienen siempre la forma `{"errores": [{"regla", "mensaje", "campo"?}]}`.
+
+| Método | Ruta | Quién | Respuestas |
+| --- | --- | --- | --- |
+| POST | `/api/login` | Público (sin token CSRF) | 200 con `usuario` y `csrf`; 401 |
+| POST | `/api/logout` | Ambos | 204 |
+| GET | `/api/yo` | Ambos | 200 con `usuario` y `csrf`; 401 |
+| GET | `/api/tecnicos`, `/api/obras` | Planificador | 200; 403 |
+| GET | `/api/visitas?tecnico_id=&fecha=&estado=` | Ambos (al técnico se le fuerzan las suyas) | 200; 422 |
+| GET | `/api/agenda?tecnico_id=&fecha=` | Ambos (el técnico, solo la suya) | 200; 403; 422 |
+| POST | `/api/visitas/validar` | Planificador | 200 con `valida`, `origen`, `siguiente` y `errores` (no guarda nada) |
+| POST | `/api/visitas` | Planificador | 201 con `id`; 403; 422 |
+| POST | `/api/visitas/{id}/completar` con `comentario` | Técnico (las suyas) | 200; 403; 404; 409; 422 |
+| POST | `/api/visitas/{id}/cancelar` con `motivo` | Ambos (el técnico, las suyas) | 200; 403; 404; 409; 422 |
+
+Además: sin sesión, 401; JSON mal formado o sin `Content-Type: application/json`, 400; campos no esperados, 422; POST sin la cabecera `X-CSRF-Token` (salvo el login) o desde otro sitio (`Origin`), 403.
+
+### Probar la API con curl
+
+Así se comprueba que las reglas y los permisos no dependen del navegador. Con la base recién cargada (`.\scripts\recrear_bd.ps1`) y el servidor en marcha en otra terminal (`.\scripts\servidor.ps1`), en PowerShell:
+
+```powershell
+. .\scripts\entorno.ps1            # carga DEMO_PASSWORD de .env
+$api = 'http://localhost:8081/api'
+$cookies = Join-Path $env:TEMP 'planificador_cookies.txt'
+$peticion = Join-Path $env:TEMP 'planificador_peticion.json'
+function Enviar([string]$ruta, $datos, [string]$token = '') {
+    # El JSON va en un archivo temporal (UTF-8 sin BOM) que se borra justo después.
+    [IO.File]::WriteAllText($peticion, ($datos | ConvertTo-Json -Compress))
+    curl.exe -s -w "`nHTTP %{http_code}`n" -b $cookies -c $cookies -H 'Content-Type: application/json' -H "X-CSRF-Token: $token" --data-binary "@$peticion" "$api$ruta"
+    Remove-Item $peticion
+}
+
+# 1. Entrar como planificador y quedarse con el token CSRF
+$token = ((Enviar '/login' @{ email = 'planificador@demo.local'; password = $env:DEMO_PASSWORD }) | Select-Object -First 1 | ConvertFrom-Json).csrf
+
+# 2. Visita inválida (desplazamiento 20): HTTP 422 y "El desplazamiento mínimo es 30 min"; no se guarda nada
+Enviar '/visitas' @{ tecnico_id = 1; obra_id = 2; fecha = (Get-Date).AddDays(7).ToString('yyyy-MM-dd'); hora_inicio = '12:00'; duracion_min = 60; desplazamiento_min = 20 } $token
+
+# 3. Ana intenta cancelar la visita 6, que es de Bernat: HTTP 403 "No tienes permiso para modificar esta visita"
+Remove-Item $cookies
+$token = ((Enviar '/login' @{ email = 'ana@demo.local'; password = $env:DEMO_PASSWORD }) | Select-Object -First 1 | ConvertFrom-Json).csrf
+Enviar '/visitas/6/cancelar' @{ motivo = 'Prueba de permisos' } $token
+
+Remove-Item $cookies
+```

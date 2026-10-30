@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Support;
 
+use DateTimeImmutable;
+use DateTimeZone;
 use RuntimeException;
 
 /**
@@ -15,6 +17,10 @@ use RuntimeException;
  */
 abstract class ApiTest extends BaseDatosTest
 {
+    use DatosDePrueba;
+
+    /** Fecha por defecto de las visitas de prueba, lejos de las del seed. */
+    protected const FECHA = '2030-01-15';
     protected const PUERTO = 8099;
     protected const COOKIE_SESION = 'planificador_sesion';
 
@@ -52,10 +58,18 @@ abstract class ApiTest extends BaseDatosTest
             proc_close(self::$servidor);
             self::$servidor = null;
         }
-        if (self::$registroServidor !== '' && is_file(self::$registroServidor)) {
-            unlink(self::$registroServidor);
-        }
+        $registro = self::$registroServidor;
+        self::$registroServidor = '';
         parent::tearDownAfterClass();
+
+        // Cualquier aviso o error de PHP en el servidor es un fallo, aunque la respuesta pareciera correcta.
+        if ($registro !== '' && is_file($registro)) {
+            $contenido = (string) file_get_contents($registro);
+            if (preg_match('/PHP (Warning|Notice|Deprecated|Fatal error|Parse error)|Error fatal|Exception/', $contenido) === 1) {
+                throw new RuntimeException("El servidor de pruebas ha registrado errores; revisa {$registro}");
+            }
+            unlink($registro);
+        }
     }
 
     // El servidor lee de la base con su propia conexión: aquí no hay transacción que deshacer.
@@ -173,9 +187,28 @@ abstract class ApiTest extends BaseDatosTest
      */
     protected function postJson(string $ruta, array $datos, array $cabeceras = []): array
     {
-        return $this->peticion('POST', $ruta, (string) json_encode($datos), $cabeceras + ['Content-Type' => 'application/json']);
+        // Un array vacío se envía como objeto vacío ({}), no como lista ([]).
+        $cuerpo = (string) json_encode($datos === [] ? new \stdClass() : $datos);
+
+        return $this->peticion('POST', $ruta, $cuerpo, $cabeceras + ['Content-Type' => 'application/json']);
     }
 
+    /**
+     * POST con cuerpo JSON y el token CSRF de la sesión.
+     *
+     * @param array<string, mixed> $datos
+     * @return array{estado: int, cabeceras: array<string, list<string>>, cuerpo: string, json: mixed}
+     */
+    protected function postConToken(string $ruta, array $datos, string $token): array
+    {
+        return $this->postJson($ruta, $datos, ['X-CSRF-Token' => $token]);
+    }
+
+    /** Fecha a $dias de hoy en Madrid (el servidor de pruebas usa el reloj real). */
+    protected static function diaRelativo(int $dias): string
+    {
+        return (new DateTimeImmutable('today', new DateTimeZone('Europe/Madrid')))->modify("{$dias} day")->format('Y-m-d');
+    }
     /** Inicia sesión y devuelve el token CSRF. */
     protected function entrar(string $email): string
     {

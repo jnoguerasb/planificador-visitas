@@ -39,10 +39,21 @@ final readonly class Respuesta
      */
     public static function errores(int $estado, array $errores): self
     {
-        return self::json($estado, ['errores' => array_map(
+        return self::json($estado, ['errores' => self::listaDeErrores($errores)]);
+    }
+
+    /**
+     * Los errores tal como van en el JSON. También los usa la previsualización, que responde 200.
+     *
+     * @param list<ErrorRegla> $errores
+     * @return list<array<string, string>>
+     */
+    public static function listaDeErrores(array $errores): array
+    {
+        return array_map(
             fn (ErrorRegla $e) => ['regla' => $e->regla, 'mensaje' => $e->mensaje] + ($e->campo === null ? [] : ['campo' => $e->campo]),
             $errores
-        )]);
+        );
     }
 
     public static function error(int $estado, string $regla, string $mensaje): self

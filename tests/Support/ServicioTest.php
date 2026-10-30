@@ -11,7 +11,6 @@ use App\VisitaService;
 use DateTimeImmutable;
 use DateTimeZone;
 use PDO;
-use RuntimeException;
 
 /**
  * Clase base de los tests de servicios y repositorios.
@@ -25,6 +24,8 @@ use RuntimeException;
  */
 abstract class ServicioTest extends BaseDatosTest
 {
+    use DatosDePrueba;
+
     protected const FECHA = '2030-01-15';
     protected const OBRA_A = 'Escuela Can Puiggener';
 
@@ -65,64 +66,6 @@ abstract class ServicioTest extends BaseDatosTest
     protected function servicio(string $ahora = self::FECHA . ' 12:00'): VisitaService
     {
         return new VisitaService($this->app(), new Reloj(new DateTimeImmutable($ahora, new DateTimeZone('Europe/Madrid'))));
-    }
-
-    /**
-     * Inserta una visita directamente con el usuario propietario y devuelve su id.
-     *
-     * @param array<string, mixed> $campos Columnas que cambian respecto a la partida común.
-     */
-    protected function insertarVisita(array $campos = []): int
-    {
-        $fila = array_merge([
-            'tecnico_id' => 1,
-            'obra_id' => 1,
-            'fecha' => self::FECHA,
-            'hora_inicio' => '10:00',
-            'duracion_min' => 60,
-            'desplazamiento_min' => 30,
-            'origen_tipo' => 'SEDE',
-            'origen_visita_id' => null,
-            'revisar_desplazamiento' => 'false',
-            'estado' => 'Programada',
-            'comentario_cierre' => null,
-            'motivo_cancelacion' => null,
-        ], $campos);
-
-        $sentencia = $this->admin()->prepare(<<<'SQL'
-            INSERT INTO visitas (tecnico_id, obra_id, fecha, hora_inicio, duracion_min, desplazamiento_min, origen_tipo,
-                                 origen_visita_id, revisar_desplazamiento, estado, comentario_cierre, motivo_cancelacion)
-            VALUES (:tecnico_id, :obra_id, :fecha, :hora_inicio, :duracion_min, :desplazamiento_min, :origen_tipo,
-                    :origen_visita_id, :revisar_desplazamiento, :estado, :comentario_cierre, :motivo_cancelacion)
-            RETURNING id
-            SQL);
-        $sentencia->execute($fila);
-
-        return (int) $sentencia->fetchColumn();
-    }
-
-    /** @return array<string, mixed> La fila completa de una visita, leída con el usuario propietario. */
-    protected function fila(int $id): array
-    {
-        $sentencia = $this->admin()->prepare(<<<'SQL'
-            SELECT v.*, to_char(v.hora_inicio, 'HH24:MI') AS inicio,
-                   to_char(v.creada_en, 'YYYY-MM-DD HH24:MI') AS creada,
-                   to_char(v.completada_en, 'YYYY-MM-DD HH24:MI') AS completada,
-                   to_char(v.cancelada_en, 'YYYY-MM-DD HH24:MI') AS cancelada
-              FROM visitas v WHERE v.id = ?
-            SQL);
-        $sentencia->execute([$id]);
-        $fila = $sentencia->fetch();
-        if ($fila === false) {
-            throw new RuntimeException("No existe la visita {$id}");
-        }
-
-        return $fila;
-    }
-
-    protected function numeroDeVisitas(): int
-    {
-        return (int) $this->valor('SELECT COUNT(*) FROM visitas');
     }
 
     /**

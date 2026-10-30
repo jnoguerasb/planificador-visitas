@@ -6,6 +6,9 @@ declare(strict_types=1);
 // La tabla de rutas dice quién puede usar cada una; lo que no está en la tabla da 404.
 
 use App\Auth;
+use App\CatalogoRepository;
+use App\ControladorCatalogo;
+use App\ControladorVisitas;
 use App\Database;
 use App\ErrorHttp;
 use App\ManejadorErrores;
@@ -16,6 +19,7 @@ use App\Router;
 use App\Ruta;
 use App\Usuario;
 use App\UsuarioRepository;
+use App\VisitaService;
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
@@ -33,7 +37,14 @@ try {
         return $pdo ??= Database::desdeEntorno('DATABASE_URL');
     };
     $auth = new Auth(static fn (): UsuarioRepository => new UsuarioRepository($conexion()));
+    $catalogo = static fn (): ControladorCatalogo => new ControladorCatalogo(new CatalogoRepository($conexion()));
+    $visitas = static fn (): ControladorVisitas => new ControladorVisitas(new VisitaService($conexion()), new CatalogoRepository($conexion()));
+
+    $planificador = [Usuario::PLANIFICADOR];
+    $tecnico = [Usuario::TECNICO];
     $todos = [Usuario::PLANIFICADOR, Usuario::TECNICO];
+    // Id de visita en la ruta: de 1 a 18 cifras, sin ceros a la izquierda (cabe en un entero de PHP).
+    $id = '(?<id>[1-9][0-9]{0,17})';
 
     $rutas = [
         Ruta::publica('GET', '#^/$#', static fn (): Respuesta => Respuesta::html((string) file_get_contents(__DIR__ . '/index.html'))),
@@ -56,6 +67,16 @@ try {
 
             return Respuesta::json(200, $perfil ?? throw ErrorHttp::noAutenticado());
         }),
+
+        // Ruta, roles permitidos y acción. Lo que no está aquí da 404.
+        Ruta::para($planificador, 'GET', '#^/api/tecnicos$#', static fn (Peticion $p) => $catalogo()->tecnicos($p)),
+        Ruta::para($planificador, 'GET', '#^/api/obras$#', static fn (Peticion $p) => $catalogo()->obras($p)),
+        Ruta::para($todos, 'GET', '#^/api/visitas$#', static fn (Peticion $p) => $visitas()->listar($p)),
+        Ruta::para($todos, 'GET', '#^/api/agenda$#', static fn (Peticion $p) => $visitas()->agenda($p)),
+        Ruta::para($planificador, 'POST', '#^/api/visitas/validar$#', static fn (Peticion $p) => $visitas()->validar($p)),
+        Ruta::para($planificador, 'POST', '#^/api/visitas$#', static fn (Peticion $p) => $visitas()->programar($p)),
+        Ruta::para($tecnico, 'POST', "#^/api/visitas/{$id}/completar$#", static fn (Peticion $p) => $visitas()->completar($p)),
+        Ruta::para($todos, 'POST', "#^/api/visitas/{$id}/cancelar$#", static fn (Peticion $p) => $visitas()->cancelar($p)),
     ];
 
     $respuesta = (new Router($rutas, $auth))->atender(Peticion::desdeGlobales());
