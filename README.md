@@ -2,7 +2,7 @@
 
 Aplicación web para planificar las visitas de los técnicos a las obras. PHP 8.3 sin framework, PostgreSQL 16 y JavaScript vanilla.
 
-> Estado: **Fase 5** (API de negocio completa, protegida por sesión, roles y CSRF). La guía de trabajo está en `CLAUDE.md` y el análisis funcional en `docs/analisis.md`.
+> Estado: **Fase 6** (interfaz del planificador: login, nueva visita con previsualización, agenda, listado y cancelación). La guía de trabajo está en `CLAUDE.md` y el análisis funcional en `docs/analisis.md`.
 
 ## Requisitos (Windows)
 
@@ -64,6 +64,7 @@ Contraseña: la de `DEMO_PASSWORD` en tu `.env`.
 | `composer test` | Las tres suites |
 | `composer check:security` | `scripts/check-security.sh` |
 | `composer verify` | Todo lo anterior. Es la puerta mínima de cada fase |
+| `.\scripts\probar_interfaz.ps1` | Abre la página en Edge sin ventana y comprueba que el JavaScript carga, se ve el login y la consola no tiene errores (no forma parte de `composer verify`: necesita Edge) |
 
 Cobertura de la suite `unit` (requiere `pcov`): `php -d pcov.enabled=1 vendor/bin/phpunit --testsuite unit --coverage-text`. Lista legible de los tests: `php vendor/bin/phpunit --testsuite unit --testdox`.
 

@@ -4,9 +4,173 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Planificador de visitas</title>
+    <link rel="stylesheet" href="/css/estilos.css">
+    <!-- Sin JavaScript ni estilos dentro del HTML: la Content-Security-Policy (default-src 'self') no los permite. -->
+    <script type="module" src="/js/app.js"></script>
 </head>
 <body>
-    <h1>Planificador de visitas</h1>
-    <p>Entorno en marcha. La interfaz llega en la Fase 6.</p>
+    <header class="cabecera">
+        <h1 class="cabecera-titulo">Planificador de visitas</h1>
+        <div id="sesion" class="cabecera-sesion" hidden>
+            <span id="sesion-nombre"></span>
+            <button id="boton-salir" type="button" class="boton boton-secundario">Salir</button>
+        </div>
+    </header>
+
+    <main class="contenido">
+        <p id="aviso-general" class="aviso aviso-error" role="alert" hidden></p>
+        <p id="cargando" class="cargando">Cargando…</p>
+
+        <!-- Login -->
+        <section id="vista-login" class="tarjeta tarjeta-estrecha" hidden aria-labelledby="titulo-login">
+            <h2 id="titulo-login">Iniciar sesión</h2>
+            <form id="form-login" class="formulario">
+                <label class="campo">
+                    <span>Email</span>
+                    <input id="login-email" type="email" autocomplete="username" required maxlength="150">
+                </label>
+                <label class="campo">
+                    <span>Contraseña</span>
+                    <input id="login-clave" type="password" autocomplete="current-password" required maxlength="1024">
+                </label>
+                <p id="login-error" class="aviso aviso-error" role="alert" hidden></p>
+                <button type="submit" class="boton">Entrar</button>
+            </form>
+        </section>
+
+        <!-- Planificación (planificador) -->
+        <section id="vista-planificacion" hidden>
+            <div class="rejilla-planificacion">
+                <section class="tarjeta" aria-labelledby="titulo-nueva">
+                    <h2 id="titulo-nueva">Nueva visita</h2>
+                    <form id="form-visita" class="formulario">
+                        <div class="fila-campos">
+                            <label class="campo">
+                                <span>Técnico</span>
+                                <select id="campo-tecnico" required><option value="">Elige un técnico</option></select>
+                                <small class="error-campo" data-error-de="tecnico_id" hidden></small>
+                            </label>
+                            <label class="campo">
+                                <span>Fecha</span>
+                                <input id="campo-fecha" type="date" required>
+                                <small class="error-campo" data-error-de="fecha" hidden></small>
+                            </label>
+                        </div>
+                        <label class="campo">
+                            <span>Obra</span>
+                            <select id="campo-obra" required><option value="">Elige una obra</option></select>
+                            <small class="error-campo" data-error-de="obra_id" hidden></small>
+                        </label>
+                        <div class="fila-campos">
+                            <label class="campo">
+                                <span>Hora de inicio</span>
+                                <input id="campo-hora" type="time" step="900" min="08:00" max="17:00" required>
+                                <small class="error-campo" data-error-de="hora_inicio" hidden></small>
+                            </label>
+                            <label class="campo">
+                                <span>Duración (min)</span>
+                                <input id="campo-duracion" type="number" min="15" max="540" step="1" value="60" required>
+                                <small class="error-campo" data-error-de="duracion_min" hidden></small>
+                            </label>
+                        </div>
+                        <label class="campo">
+                            <span>Desplazamiento (min)</span>
+                            <input id="campo-desplazamiento" type="number" min="30" max="240" step="1" value="30" required>
+                            <small id="texto-origen" class="ayuda">Elige técnico, fecha y hora para ver desde dónde sale.</small>
+                            <small class="error-campo" data-error-de="desplazamiento_min" hidden></small>
+                        </label>
+                        <label id="grupo-siguiente" class="campo" hidden>
+                            <span id="etiqueta-siguiente">Desplazamiento hasta la siguiente visita (min)</span>
+                            <input id="campo-siguiente" type="number" min="30" max="240" step="1">
+                            <small class="error-campo" data-error-de="desplazamiento_siguiente_min" hidden></small>
+                        </label>
+                        <ul id="errores-visita" class="lista-errores" role="alert" hidden></ul>
+                        <p id="mensaje-visita" class="aviso aviso-exito" role="status" hidden></p>
+                        <button type="submit" class="boton">Guardar visita</button>
+                    </form>
+                </section>
+
+                <section class="tarjeta" aria-labelledby="titulo-agenda">
+                    <h2 id="titulo-agenda">Agenda del técnico</h2>
+                    <div id="agenda-planificacion" class="agenda">
+                        <p class="ayuda">Elige técnico y fecha para ver su agenda.</p>
+                    </div>
+                </section>
+            </div>
+
+            <section class="tarjeta" aria-labelledby="titulo-listado">
+                <h2 id="titulo-listado">Visitas</h2>
+                <form id="form-filtros" class="formulario fila-campos">
+                    <label class="campo">
+                        <span>Técnico</span>
+                        <select id="filtro-tecnico"><option value="">Todos</option></select>
+                    </label>
+                    <label class="campo">
+                        <span>Fecha</span>
+                        <input id="filtro-fecha" type="date">
+                    </label>
+                    <label class="campo">
+                        <span>Estado</span>
+                        <select id="filtro-estado">
+                            <option value="">Todos</option>
+                            <option value="Programada">Programada</option>
+                            <option value="Completada">Completada</option>
+                            <option value="Cancelada">Cancelada</option>
+                        </select>
+                    </label>
+                </form>
+                <ul id="errores-listado" class="lista-errores" role="alert" hidden></ul>
+                <div class="tabla-contenedor">
+                    <table class="tabla">
+                        <thead>
+                            <tr>
+                                <th scope="col">Fecha</th>
+                                <th scope="col">Hora</th>
+                                <th scope="col">Técnico</th>
+                                <th scope="col">Obra</th>
+                                <th scope="col">Desplazamiento</th>
+                                <th scope="col">Estado</th>
+                                <th scope="col">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cuerpo-listado"></tbody>
+                    </table>
+                </div>
+            </section>
+        </section>
+
+        <!-- Mi agenda (técnico) -->
+        <section id="vista-mi-agenda" hidden>
+            <section class="tarjeta" aria-labelledby="titulo-mi-agenda">
+                <h2 id="titulo-mi-agenda">Mi agenda</h2>
+                <nav class="navegacion-dia" aria-label="Cambiar de día">
+                    <button id="dia-anterior" type="button" class="boton boton-secundario" aria-label="Día anterior">‹ Anterior</button>
+                    <input id="dia-actual" type="date" aria-label="Día">
+                    <button id="dia-siguiente" type="button" class="boton boton-secundario" aria-label="Día siguiente">Siguiente ›</button>
+                </nav>
+                <ul id="errores-mi-agenda" class="lista-errores" role="alert" hidden></ul>
+                <div id="agenda-tecnico" class="agenda"></div>
+                <div id="tarjetas-visitas" class="tarjetas-visitas"></div>
+            </section>
+        </section>
+    </main>
+
+    <!-- Ventana para escribir un motivo o un comentario (texto obligatorio, validado en el servidor). -->
+    <dialog id="dialogo-texto" class="dialogo" aria-labelledby="dialogo-titulo">
+        <form id="dialogo-form" class="formulario">
+            <h2 id="dialogo-titulo"></h2>
+            <p id="dialogo-descripcion" class="ayuda"></p>
+            <label class="campo">
+                <span id="dialogo-etiqueta"></span>
+                <textarea id="dialogo-texto-campo" rows="5"></textarea>
+                <small id="dialogo-contador" class="ayuda" aria-live="polite"></small>
+            </label>
+            <ul id="dialogo-errores" class="lista-errores" role="alert" hidden></ul>
+            <div class="botonera">
+                <button id="dialogo-volver" type="button" class="boton boton-secundario">Volver</button>
+                <button id="dialogo-confirmar" type="submit" class="boton"></button>
+            </div>
+        </form>
+    </dialog>
 </body>
 </html>
