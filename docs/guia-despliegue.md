@@ -23,7 +23,7 @@ Vas a necesitar tres. Guárdalas en un gestor de contraseñas desde el momento e
 | Contraseña | Para qué | Quién la crea |
 | --- | --- | --- |
 | `planificador_admin` | Propietario de la base: migración y datos de ejemplo. Solo la usas tú desde tu equipo | Neon (la muestra una vez) |
-| `app_planificador` | La que usa la aplicación en Render (`DATABASE_URL`). Solo `SELECT`, `INSERT`, `UPDATE` | Tú, en el paso A6 |
+| `app_planificador` | La que usa la aplicación en Render (`DATABASE_URL`). Solo `SELECT`, `INSERT`, `UPDATE` | Tú, en el paso A6 (oculta, con `Read-Host`) |
 | `DEMO_PASSWORD` de producción | Contraseña de los usuarios demo publicados | Tú, en el paso C3 |
 
 Recomendación: para `app_planificador`, solo letras y números, al menos 24 caracteres. Así no hay que codificar nada en la URL. Usa una `DEMO_PASSWORD` **distinta** de la de tu `.env` local.
@@ -53,35 +53,41 @@ Neon crea automáticamente una base `neondb` y un rol `neondb_owner`. No los usa
 - **Desactiva "Connection pooling"**. La aplicación fija la zona horaria por conexión, y el *pooler* de Neon (PgBouncer en modo transacción) no conserva ese ajuste entre peticiones.
 - Copia solo el **host**. Tiene esta forma: `ep-algo-123456.eu-central-1.aws.neon.tech`. Si contiene `-pooler`, el pooling sigue activado.
 
-**A6. Crear el usuario de la aplicación y cargar el esquema.** En PowerShell, desde la carpeta del proyecto:
+**A6. Crear el usuario de la aplicación y cargar el esquema.** En PowerShell, desde la carpeta del proyecto. Primero, la contraseña de `app_planificador`: se escribe oculta y queda solo en una variable de esta ventana.
+
+> Neon no admite `\password` de psql: rechaza las contraseñas ya cifradas ("Neon only supports being given plaintext passwords"). Por eso se pasa así, sin que se vea en pantalla ni quede escrita; viaja cifrada por TLS.
 
 ```powershell
 . .\scripts\entorno.ps1                                  # pone psql en el PATH
 $neon = 'ep-algo-123456.eu-central-1.aws.neon.tech'       # <-- tu host del paso A5
 $env:PGCLIENTENCODING = 'UTF8'                            # que los acentos lleguen bien
+$s = Read-Host 'Contraseña para app_planificador' -AsSecureString
+$env:CLAVE_APP = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($s))
 psql "host=$neon dbname=planificador user=planificador_admin sslmode=require"
 ```
 
-`psql` te pedirá la contraseña de `planificador_admin`. Pégala; no se ve al escribir. Ya dentro de `psql` (el indicador es `planificador=>`), ejecuta línea a línea:
+`psql` pedirá la contraseña de `planificador_admin` (no se ve al escribir). Dentro de `psql` (indicador `planificador=>`), línea a línea:
 
 ```sql
 CREATE ROLE app_planificador LOGIN;
-\password app_planificador
-```
-
-`\password` pide la contraseña nueva dos veces. Pon la de `app_planificador` que has elegido. Viaja cifrada y no queda en el historial. Después:
-
-```sql
+\getenv clave CLAVE_APP
+SELECT format('ALTER ROLE app_planificador WITH PASSWORD %L', :'clave') \gexec
 \i db/migrations/001_esquema.sql
 \i db/seed.sql
 SELECT count(*) AS visitas FROM visitas;
 \q
 ```
 
-Debe salir `visitas = 12`. La migración ya da a `app_planificador` solo `SELECT`, `INSERT` y `UPDATE`.
+Respuestas esperadas:
+- `CREATE ROLE` y `ALTER ROLE`; la contraseña no aparece en ninguna.
+- `CREATE TABLE` cinco veces, `CREATE INDEX` dos y `GRANT` tres.
+- Los `INSERT` y `visitas = 12`.
 
-> Si `CREATE ROLE` da "permiso denegado", sal con `\q`, vuelve a entrar con `user=neondb_owner` (su contraseña está en *Connect*), crea el rol y su contraseña, y vuelve a entrar como `planificador_admin` para los `\i`.
+La migración ya da a `app_planificador` solo `SELECT`, `INSERT` y `UPDATE`. Al salir, borra la variable temporal: `Remove-Item Env:CLAVE_APP; Remove-Variable s`.
 
+> - Si `CREATE ROLE` da "permiso denegado": sal con `\q` y vuelve a entrar con `user=neondb_owner` (su contraseña está en *Connect*). Haz allí `CREATE ROLE`, `\getenv` y el `ALTER ROLE`, y vuelve a entrar como `planificador_admin` para los `\i`.
+> - Si Neon rechaza la contraseña por débil (*entropy*), elige una más larga.
+> - Si un `\i` falla a mitad y hay que repetirlo, empieza de cero con `DROP SCHEMA public CASCADE; CREATE SCHEMA public;` (como `planificador_admin`).
 **A7. Comprobar que la aplicación no puede borrar.**
 
 ```powershell
