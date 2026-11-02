@@ -51,7 +51,7 @@ abstract class BaseDatosTest extends TestCase
         $raiz = dirname(__DIR__, 2);
         $pdo->exec('DROP SCHEMA IF EXISTS public CASCADE');
         $pdo->exec('CREATE SCHEMA public');
-        // Todas las migraciones, en orden (001, 002...), como recrear_bd.ps1.
+        // Todas las migraciones de db/migrations, en orden, como recrear_bd.ps1.
         $migraciones = glob($raiz . '/db/migrations/*.sql') ?: [];
         sort($migraciones);
         foreach ($migraciones as $migracion) {

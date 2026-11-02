@@ -226,7 +226,7 @@ Cinco tablas: `sede`, `tecnicos`, `obras`, `usuarios` y `visitas`. La visita gua
 | usuarios | tecnico\_id | INT FK → tecnicos, NULL | Obligatorio si el rol es TECNICO |
 | visitas | id, tecnico\_id, obra\_id, fecha, hora\_inicio | Igual que antes |  |
 | visitas | duracion\_min | INT | 15–540 |
-| visitas | desplazamiento\_min | INT DEFAULT 30 | 0–240 (migración 002); el validador exige 30 entre obras diferentes. Minutos para llegar a esta visita |
+| visitas | desplazamiento\_min | INT DEFAULT 30 | 0–240; el validador exige 30 entre obras diferentes. Minutos para llegar a esta visita |
 | visitas | origen\_tipo | VARCHAR(6) | SEDE o VISITA |
 | visitas | origen\_visita\_id | INT FK → visitas, NULL | Visita desde la que sale; NULL si sale de la sede |
 | visitas | revisar\_desplazamiento | BOOLEAN DEFAULT FALSE | Se activa si el origen cambia por una cancelación |
@@ -263,7 +263,7 @@ CREATE TABLE visitas (
   fecha                  DATE NOT NULL,
   hora_inicio            TIME NOT NULL,
   duracion_min           INT  NOT NULL CHECK (duracion_min BETWEEN 15 AND 540),
-  desplazamiento_min     INT  NOT NULL DEFAULT 30 CHECK (desplazamiento_min BETWEEN 0 AND 240),  -- 30–240 hasta la migración 002 (R1 y R2)
+  desplazamiento_min     INT  NOT NULL DEFAULT 30 CHECK (desplazamiento_min BETWEEN 0 AND 240),  -- 0: desde la sede o en la misma obra (R1 y R2)
   origen_tipo            VARCHAR(6) NOT NULL CHECK (origen_tipo IN ('SEDE', 'VISITA')),
   origen_visita_id       INT NULL REFERENCES visitas(id),
   revisar_desplazamiento BOOLEAN NOT NULL DEFAULT FALSE,

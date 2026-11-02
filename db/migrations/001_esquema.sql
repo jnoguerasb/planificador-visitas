@@ -59,7 +59,9 @@ CREATE TABLE visitas (
     cancelada_por          INT NULL REFERENCES usuarios (id),
     cancelada_en           TIMESTAMP NULL,
     CONSTRAINT ck_visitas_duracion       CHECK (duracion_min BETWEEN 15 AND 540),
-    CONSTRAINT ck_visitas_desplazamiento CHECK (desplazamiento_min BETWEEN 30 AND 240),
+    -- 0–240: el mínimo de 30 solo se exige entre obras diferentes (desde la sede o en la misma obra es 0;
+    -- R1 y R2 del análisis). El mínimo de cada caso lo aplica ValidadorVisita.
+    CONSTRAINT ck_visitas_desplazamiento CHECK (desplazamiento_min BETWEEN 0 AND 240),
     CONSTRAINT ck_visitas_origen_tipo    CHECK (origen_tipo IN ('SEDE', 'VISITA')),
     CONSTRAINT ck_visitas_estado         CHECK (estado IN ('Programada', 'Completada', 'Cancelada')),
     CONSTRAINT ck_visitas_hora_inicio    CHECK (hora_inicio >= TIME '08:00'),

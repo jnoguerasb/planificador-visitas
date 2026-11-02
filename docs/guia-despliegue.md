@@ -73,7 +73,6 @@ CREATE ROLE app_planificador LOGIN;
 \getenv clave CLAVE_APP
 SELECT format('ALTER ROLE app_planificador WITH PASSWORD %L', :'clave') \gexec
 \i db/migrations/001_esquema.sql
-\i db/migrations/002_desplazamiento_minimo.sql
 \i db/seed.sql
 SELECT count(*) AS visitas FROM visitas;
 \q
@@ -81,7 +80,7 @@ SELECT count(*) AS visitas FROM visitas;
 
 Respuestas esperadas:
 - `CREATE ROLE` y `ALTER ROLE`; la contraseña no aparece en ninguna.
-- `CREATE TABLE` cinco veces, `CREATE INDEX` dos y `GRANT` tres; luego `ALTER TABLE` dos veces (migración 002).
+- `CREATE TABLE` cinco veces, `CREATE INDEX` dos y `GRANT` tres.
 - Los `INSERT` y `visitas = 12`.
 
 La migración ya da a `app_planificador` solo `SELECT`, `INSERT` y `UPDATE`. Al salir, borra la variable temporal: `Remove-Item Env:CLAVE_APP; Remove-Variable s`.
@@ -89,16 +88,21 @@ La migración ya da a `app_planificador` solo `SELECT`, `INSERT` y `UPDATE`. Al 
 > - Si `CREATE ROLE` da "permiso denegado": sal con `\q` y vuelve a entrar con `user=neondb_owner` (su contraseña está en *Connect*). Haz allí `CREATE ROLE`, `\getenv` y el `ALTER ROLE`, y vuelve a entrar como `planificador_admin` para los `\i`.
 > - Si Neon rechaza la contraseña por débil (*entropy*), elige una más larga.
 > - Si un `\i` falla a mitad y hay que repetirlo, empieza de cero con `DROP SCHEMA public CASCADE; CREATE SCHEMA public;` (como `planificador_admin`).
-**A6 bis. Si ya cargaste la base antes del 02/11/2026** (sin la migración 002), aplícala sola. No borra datos:
 
-```powershell
-. .\scripts\entorno.ps1
-$neon = 'ep-algo-123456.eu-central-1.aws.neon.tech'       # <-- tu host
-$env:PGCLIENTENCODING = 'UTF8'
-psql "host=$neon dbname=planificador user=planificador_admin sslmode=require" -f db/migrations/002_desplazamiento_minimo.sql
+**A6 bis. Si cargaste la base antes del 02/11/2026,** tiene la regla antigua del desplazamiento (mínimo 30 siempre). Compruébalo y, si hace falta, actualízala; no borra datos. Dentro de `psql`, como `planificador_admin` (indicador `planificador=>`):
+
+```sql
+SELECT pg_get_constraintdef(oid) AS regla FROM pg_constraint WHERE conname = 'ck_visitas_desplazamiento';
 ```
 
-Debe responder `ALTER TABLE` dos veces.
+Si la respuesta contiene `desplazamiento_min >= 30`, ejecuta estas dos líneas; cada una responde `ALTER TABLE`:
+
+```sql
+ALTER TABLE visitas DROP CONSTRAINT ck_visitas_desplazamiento;
+ALTER TABLE visitas ADD CONSTRAINT ck_visitas_desplazamiento CHECK (desplazamiento_min BETWEEN 0 AND 240);
+```
+
+Si contiene `desplazamiento_min >= 0`, ya está al día.
 
 **A7. Comprobar que la aplicación no puede borrar.**
 

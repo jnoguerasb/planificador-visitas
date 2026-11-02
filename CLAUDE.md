@@ -136,7 +136,7 @@ Validación manual: el usuario clona el repo en otra carpeta, sigue solo el READ
 **Objetivo:** esquema completo con todas sus restricciones y datos de ejemplo cargables.
 
 Tareas:
-- `db/migrations/001_esquema.sql` según la sección 5 del análisis: `sede`, `tecnicos`, `obras`, `usuarios`, `visitas`, índices y todos los `CHECK` (incluido `desplazamiento_min BETWEEN 30 AND 240`, que la migración `002` cambió a 0–240 al resolver R1 y R2, y el de fin de jornada calculado en minutos, nunca con `TIME + INTERVAL`).
+- `db/migrations/001_esquema.sql` según la sección 5 del análisis: `sede`, `tecnicos`, `obras`, `usuarios`, `visitas`, índices y todos los `CHECK` (incluido `desplazamiento_min BETWEEN 0 AND 240`, con 0 desde la sede o en la misma obra tras resolver R1 y R2, y el de fin de jornada calculado en minutos, nunca con `TIME + INTERVAL`).
 - Creación del rol `app_planificador` con `GRANT SELECT, INSERT, UPDATE` sobre las tablas y `USAGE` sobre las secuencias; sin `DELETE`.
 - `db/seed.sql`: sede, 4 técnicos, 6 obras en 4 municipios, unas 12 visitas con fechas relativas a `CURRENT_DATE` (incluida una Completada con comentario, una Cancelada con motivo y casos límite de desplazamiento). Sin usuarios.
 - `bin/crear_usuarios_demo.php`: crea `planificador@demo.local` y un usuario por técnico con `DEMO_PASSWORD`; idempotente; falla con mensaje claro si la variable no existe.
@@ -144,7 +144,7 @@ Tareas:
 
 Tests (suite `integration`, escritos antes de dar la fase por buena):
 - El seed carga el número esperado de filas por tabla.
-- Cada `CHECK` rechaza su caso: duración 0 y 541, desplazamiento 29 y 241 (desde la migración `002`: negativo y 241), inicio 07:59, fin 17:01, inicio 16:00 con 540 min (el caso de la vuelta a medianoche), estado inválido, Completada sin comentario, Cancelada sin motivo, origen `SEDE` con `origen_visita_id`, rol `TECNICO` sin `tecnico_id`.
+- Cada `CHECK` rechaza su caso: duración 0 y 541, desplazamiento negativo y 241, inicio 07:59, fin 17:01, inicio 16:00 con 540 min (el caso de la vuelta a medianoche), estado inválido, Completada sin comentario, Cancelada sin motivo, origen `SEDE` con `origen_visita_id`, rol `TECNICO` sin `tecnico_id`.
 - Conectado como `app_planificador`, un `DELETE` sobre `visitas` falla por permisos.
 - `crear_usuarios_demo.php` es idempotente y guarda hashes, nunca la contraseña en claro.
 
