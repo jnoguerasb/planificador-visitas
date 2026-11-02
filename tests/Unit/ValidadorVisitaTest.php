@@ -13,8 +13,8 @@ use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Casos de la sección 8 (1–20, salvo el 19, que está en ReasignadorOrigenTest) y ejemplos de la
- * sección 4 del análisis. Partida común: Ana tiene una visita Programada de 10:00 a 11:00 en la
+ * Casos de prueba 1–20 (el 19 está en ReasignadorOrigenTest) y ejemplos de las reglas de
+ * programación. Partida común: Ana tiene una visita Programada de 10:00 a 11:00 en la
  * Obra A, con 30 min de desplazamiento desde la sede.
  */
 final class ValidadorVisitaTest extends TestCase
@@ -52,7 +52,7 @@ final class ValidadorVisitaTest extends TestCase
         $this->assertErrores([[ErrorRegla::SOLAPE, 'Solapa con la visita de 10:00 a 11:00 en Obra A']], $resultado);
     }
 
-    #[TestDox('Caso 4: 11:00–12:00 en la misma Obra A se guarda sin desplazamiento (R1: los 30 min solo entre obras diferentes)')]
+    #[TestDox('Caso 4: 11:00–12:00 en la misma Obra A se guarda sin desplazamiento (los 30 min solo se exigen entre obras diferentes)')]
     public function testCaso04MismaObraSinDesplazamiento(): void
     {
         $resultado = $this->validar($this->datos('11:00', 60, ['obra_id' => 1, 'desplazamiento_min' => 0]));
@@ -290,7 +290,7 @@ final class ValidadorVisitaTest extends TestCase
         $this->assertErrores([[ErrorRegla::CAMPOS, 'El desplazamiento mínimo es 30 min']], $resultado);
     }
 
-    #[TestDox('Ejemplo 8: 08:00–08:45 sin desplazamiento desde la sede se guarda (R2); con 30 min indicados, saldría a las 07:30: JORNADA')]
+    #[TestDox('Ejemplo 8: 08:00–08:45 sin desplazamiento desde la sede se guarda; con 30 min indicados, saldría a las 07:30: JORNADA')]
     public function testEjemplo08PrimeraVisitaALas08(): void
     {
         $resultado = $this->validar($this->datos('08:00', 45, ['desplazamiento_min' => 0]));
@@ -303,15 +303,15 @@ final class ValidadorVisitaTest extends TestCase
         );
     }
 
-    #[TestDox('Ejemplo 9: 11:00–12:00 en la misma Obra A, pegada a la anterior, se guarda (R1)')]
+    #[TestDox('Ejemplo 9: 11:00–12:00 en la misma Obra A, pegada a la anterior, se guarda')]
     public function testEjemplo09MismaObra(): void
     {
         $this->assertSinErrores($this->validar($this->datos('11:00', 60, ['obra_id' => 1, 'desplazamiento_min' => 0])));
     }
 
-    // --- Desplazamiento mínimo según el origen (R1 y R2) ---
+    // --- Desplazamiento mínimo según el origen ---
 
-    #[TestDox('R2: desde la sede el mínimo es 0; vacío o negativo da CAMPOS')]
+    #[TestDox('Desde la sede el mínimo es 0; vacío o negativo da CAMPOS')]
     public function testDesdeLaSedeElMinimoEs0(): void
     {
         $this->assertSinErrores($this->validar($this->datos('08:00', 60, ['desplazamiento_min' => 0]), []));
@@ -334,7 +334,7 @@ final class ValidadorVisitaTest extends TestCase
         self::assertSame(30, $resultado->desplazamientoMinimo);
     }
 
-    #[TestDox('R1 hacia la siguiente: en la misma obra se puede encadenar sin desplazamiento')]
+    #[TestDox('Hacia la siguiente: en la misma obra se puede encadenar sin desplazamiento')]
     public function testSiguienteEnLaMismaObra(): void
     {
         $resultado = $this->validar($this->datos('09:00', 60, ['obra_id' => 1, 'desplazamiento_min' => 0]));
@@ -413,7 +413,7 @@ final class ValidadorVisitaTest extends TestCase
         $this->assertSinErrores($this->validar($this->datos('12:00', 15), []));
         $this->assertSinErrores($this->validar($this->datos('12:00', 60, ['desplazamiento_min' => 30]), []));
         $this->assertSinErrores($this->validar($this->datos('12:00', 60, ['desplazamiento_min' => 240]), []));
-        // Sin desplazamiento desde la sede (R2), una visita de 540 min ocupa la jornada entera.
+        // Sin desplazamiento desde la sede, una visita de 540 min ocupa la jornada entera.
         $this->assertSinErrores($this->validar($this->datos('08:00', 540, ['desplazamiento_min' => 0]), []));
     }
 

@@ -1,142 +1,167 @@
 # Planificador de visitas a obras
 
-Aplicación web para planificar las visitas de los técnicos a las obras. PHP 8.3 sin framework, PostgreSQL 16 y JavaScript vanilla.
+Aplicación web para planificar las visitas de los técnicos a las obras. Hecha con PHP 8.3 sin framework, PostgreSQL 16 y JavaScript vanilla sin build.
 
-> Estado: **fases 0–9 desarrolladas**; pendientes la validación manual de las interfaces y la publicación en Render. Decisiones, supuestos y pendientes: [`DECISIONES.md`](DECISIONES.md). Análisis funcional: `docs/analisis.md`. Guía de trabajo: `CLAUDE.md`.
+**Aplicación publicada:** https://planificador-visitas.onrender.com (Render + Neon, plan gratuito: la primera petición tras un rato sin uso puede tardar 30–60 s).
 
-## Qué hace
+| Usuario | Perfil |
+| --- | --- |
+| `planificador@demo.local` | Planificador: programa visitas viendo la agenda del técnico, filtra el listado y cancela |
+| `ana@demo.local`, `bernat@demo.local`, `carla@demo.local`, `david@demo.local` | Técnico: ve su agenda del día, completa (con comentario) o cancela (con motivo) sus visitas |
 
-- **Planificador** (`planificador@demo.local`): programa visitas viendo la agenda del técnico. La visita propuesta aparece en verde si cabe y en rojo si choca, antes de guardar. También filtra el listado y cancela visitas con motivo.
-- **Técnico** (`ana@demo.local`…): ve su agenda día a día y completa (con comentario) o cancela (con motivo) sus visitas.
-- Reglas: sin solapes, dentro de la jornada de 08:00 a 17:00, y con al menos 30 min de desplazamiento entre visitas a obras diferentes (desde la sede o en la misma obra no hay mínimo).
+La contraseña de la versión publicada se entrega aparte. En local es la que elijas al arrancar.
 
-## Requisitos (Windows)
+## Ejecutar en local (menos de 10 minutos)
 
-| Programa | Versión | Dónde |
-| --- | --- | --- |
-| PHP | 8.3, Non Thread Safe x64, en `C:\php83` | https://windows.php.net/download |
-| PostgreSQL | 16, instalado como servicio en el puerto 5432 | https://www.enterprisedb.com/downloads/postgres-postgresql-downloads |
-| Composer | 2.x | https://getcomposer.org |
-| Git for Windows | cualquiera reciente (incluye `bash`) | https://git-scm.com |
+Requisitos: PHP 8.3 con la extensión `pdo_pgsql` activada, PostgreSQL 16 y Composer. `php`, `psql` y `composer` deben estar en el `PATH`.
 
-En `C:\php83\php.ini` deben estar activadas las extensiones `curl`, `mbstring`, `openssl`, `pdo_pgsql` y `zip`, y `display_errors = Off`.
+Al arrancar se piden tres contraseñas que eliges tú: las de los dos usuarios de base de datos y la de los usuarios demo. Usa solo letras y números, porque van dentro de una URL de conexión. No se guardan en ningún archivo.
 
-Para medir la cobertura de los tests (opcional): copia `php_pcov.dll` de [pcov 1.0.12 para PHP 8.3 NTS x64](https://downloads.php.net/~windows/pecl/releases/pcov/1.0.12/) en `C:\php83\ext` y añade al `php.ini` `extension=pcov` y `pcov.enabled=0`.
+**Linux / macOS (bash):**
 
-Si PowerShell no deja ejecutar scripts, ejecuta una vez: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
-
-## Arranque (menos de 10 minutos con los requisitos instalados)
-
-En `.env` (copiado de `.env.example`) pon:
-
-- **Dos contraseñas que elijas**: una para `app_planificador` y otra para `planificador_admin`. Cada una va en su URL y en la URL `_TEST` correspondiente. `crear_bases.ps1` crea los usuarios con ellas.
-- Una `DEMO_PASSWORD` para los usuarios demo.
-- `PG_BIN`, si PostgreSQL no está en la carpeta por defecto.
-
-En PowerShell, desde la carpeta del proyecto:
-
-```powershell
-Copy-Item .env.example .env        # y edita .env con tus valores
-. .\scripts\entorno.ps1            # con el punto delante: carga PHP 8.3 y .env en esta sesión
+```bash
+git clone https://github.com/jnoguerasb/planificador-visitas.git
+cd planificador-visitas
 composer install
-.\scripts\crear_bases.ps1          # roles y bases; pide la contraseña del superusuario postgres
-.\scripts\recrear_bd.ps1           # esquema, datos de ejemplo y usuarios demo
-composer verify                    # lint + tests + comprobaciones de seguridad
-.\scripts\servidor.ps1             # http://localhost:8081 (Ctrl+C para parar)
+
+read -rsp 'Contraseña para planificador_admin: ' CLAVE_ADMIN; echo
+read -rsp 'Contraseña para app_planificador: ' CLAVE_APP; echo
+read -rsp 'Contraseña de los usuarios demo: ' DEMO_PASSWORD; echo
+export DEMO_PASSWORD DATABASE_URL="postgres://app_planificador:${CLAVE_APP}@localhost:5432/planificador"
+
+# Usuarios y bases de datos (pide la contraseña del superusuario postgres)
+psql -h localhost -U postgres -v ON_ERROR_STOP=1 -v clave_admin=$CLAVE_ADMIN -v clave_app=$CLAVE_APP -f db/crear_bases.sql
+# Esquema y datos de ejemplo
+PGPASSWORD=$CLAVE_ADMIN psql -h localhost -U planificador_admin -d planificador -1 -v ON_ERROR_STOP=1 -f db/migrations/001_esquema.sql -f db/seed.sql
+# Usuarios demo y servidor
+php bin/crear_usuarios_demo.php
+php -S localhost:8081 -t public
 ```
 
-Si el puerto 8081 está ocupado por otro programa, usa otro: `.\scripts\servidor.ps1 -Puerto 8082`.
+**Windows (PowerShell):**
 
-### Base de datos
+```powershell
+git clone https://github.com/jnoguerasb/planificador-visitas.git
+cd planificador-visitas
+composer install
 
-- Dos usuarios, ambos sin privilegios de superusuario: `planificador_admin` (`DATABASE_ADMIN_URL`), propietario de las bases, ejecuta migraciones y seed; y `app_planificador` (`DATABASE_URL`), el de la aplicación, que solo puede `SELECT`, `INSERT` y `UPDATE`.
-- `crear_bases.ps1` crea los dos usuarios con las contraseñas de `.env` y las bases `planificador` y `planificador_test`. Si cambias una contraseña en `.env`, vuelve a ejecutarlo.
-- `recrear_bd.ps1` **borra todos los datos** de la base de desarrollo y la vuelve a cargar con `db/migrations/001_esquema.sql`, `db/seed.sql` y los usuarios demo.
-- Los tests de integración recrean `planificador_test` por su cuenta.
+$claveAdmin = Read-Host 'Contraseña para planificador_admin'
+$claveApp = Read-Host 'Contraseña para app_planificador'
+$env:DEMO_PASSWORD = Read-Host 'Contraseña de los usuarios demo'
+$env:DATABASE_URL = "postgres://app_planificador:$claveApp@localhost:5432/planificador"
 
-### Usuarios demo
+psql -h localhost -U postgres -v ON_ERROR_STOP=1 -v clave_admin=$claveAdmin -v clave_app=$claveApp -f db/crear_bases.sql
+$env:PGPASSWORD = $claveAdmin
+psql -h localhost -U planificador_admin -d planificador -1 -v ON_ERROR_STOP=1 -f db/migrations/001_esquema.sql -f db/seed.sql
+Remove-Item Env:PGPASSWORD
+php bin/crear_usuarios_demo.php
+php -S localhost:8081 -t public
+```
 
-Contraseña: la de `DEMO_PASSWORD` en tu `.env`.
+Abre **http://localhost:8081**, con `localhost` y no con una IP: la cookie de sesión es `Secure` y el navegador solo la acepta sin HTTPS en `localhost`.
 
-| Email | Perfil |
+- **Si el puerto 8081 está ocupado:** usa otro, por ejemplo `-S localhost:8082`.
+- **Para volver a arrancar en otra terminal:** basta con definir `DATABASE_URL` y ejecutar `php -S`.
+
+### Tests
+
+Con las variables del paso anterior definidas en la misma terminal:
+
+```bash
+export DATABASE_URL_TEST="postgres://app_planificador:${CLAVE_APP}@localhost:5432/planificador_test"
+export DATABASE_ADMIN_URL_TEST="postgres://planificador_admin:${CLAVE_ADMIN}@localhost:5432/planificador_test"
+composer verify
+```
+
+En PowerShell, igual pero con `$env:DATABASE_URL_TEST = "..."`.
+
+`composer verify` hace tres cosas:
+- **`composer lint`:** revisa la sintaxis de los archivos PHP.
+- **`composer test`:** 411 tests, en tres suites:
+  - `unit`: reglas de negocio, sin base de datos;
+  - `integration`: contra `planificador_test`, que se recrea sola;
+  - `api`: HTTP contra un servidor PHP de pruebas.
+- **`composer check:security`:** busca `innerHTML`, SQL concatenado, secretos o `display_errors` activado. Necesita `bash`; en Windows, el de Git for Windows.
+
+Los tests se niegan a usar una base cuyo nombre no acabe en `_test`.
+
+## Qué he hecho y qué queda pendiente
+
+**Hecho:**
+- **Lo que pide el enunciado:** programar visitas sin solapes, dentro de la jornada de 08:00 a 17:00 y con al menos 30 min de desplazamiento entre obras diferentes.
+- **Ampliación 1, desplazamiento variable:** cada visita guarda su desplazamiento (de 0 a 240 min) y su origen (la sede o la visita anterior). Lo calcula el servidor. Al intercalar o cancelar una visita, se actualiza la siguiente.
+- **Ampliación 2, perfiles:** hay planificador y técnico. El técnico completa sus visitas con un comentario y las cancela con un motivo; queda registrado quién y cuándo.
+- **Ampliación 3, agenda diaria:** muestra la agenda del técnico con los huecos libres. Antes de guardar, la visita propuesta aparece en verde si cabe o en rojo si choca, con la misma validación que al guardar.
+- **Tests y despliegue:** 411 tests automáticos; publicada en Render (Docker) con la base de datos en Neon.
+
+**Pendiente:**
+- gestión de técnicos, obras y usuarios desde pantalla;
+- editar o reprogramar visitas;
+- vuelta a la sede al final del día;
+- festivos y jornadas por técnico;
+- avisos;
+- paginación;
+- límite de intentos de login.
+
+## Decisiones principales
+
+- **PHP sin framework, PostgreSQL y JS vanilla.** Quien mantenga el código conoce PHP, JS y SQL; así no tiene que aprender un framework ni mantener un build.
+- **Reglas en un solo sitio.** Están en clases sin base de datos (`ValidadorVisita`, `CalculadoraAgenda`, `Permisos`) y las constantes en `Reglas`. La previsualización (`POST /api/visitas/validar`) usa la misma validación que Guardar. El navegador solo muestra lo que dice el servidor.
+- **Se rechaza, no se corrige.** Un desplazamiento de 20 min entre obras devuelve 422 con "El desplazamiento mínimo es 30 min". El servidor nunca lo cambia a 30 por su cuenta.
+- **Concurrencia.** Cada escritura bloquea al técnico (`SELECT … FOR UPDATE`) antes de validar. Así, dos planificadores no pueden guardar a la vez visitas incompatibles. Un test con dos procesos lo comprueba.
+- **Base de datos como segunda barrera.** Los `CHECK` repiten los límites del validador. La aplicación se conecta con un usuario que solo puede `SELECT`, `INSERT` y `UPDATE`: las visitas nunca se borran, solo cambian de estado.
+- **Seguridad.**
+  - Solo sentencias preparadas.
+  - Cookie de sesión `Secure`, `HttpOnly` y `SameSite=Strict`, con caducidad.
+  - Token CSRF en todos los POST salvo el login, que solo acepta JSON y rechaza un `Origin` ajeno.
+  - `Content-Security-Policy: default-src 'self'` y solo DOM seguro (`textContent`) en el navegador.
+  - Errores genéricos al cliente; el detalle va al registro.
+- **Hora siempre en Europe/Madrid**, aunque el servidor de Render funcione en UTC.
+
+## Supuestos
+
+| Duda | Supuesto |
 | --- | --- |
-| `planificador@demo.local` | Planificador |
-| `ana@demo.local`, `bernat@demo.local`, `carla@demo.local`, `david@demo.local` | Técnico |
+| ¿Pueden tocarse dos visitas? | Sí: los intervalos son `[inicio, fin)` |
+| Visitas que ocupan horario | Programadas y Completadas. Las Canceladas lo liberan |
+| Misma obra | Sin mínimo: dos visitas seguidas en la misma obra pueden ir pegadas (los 30 min son "entre obras diferentes") |
+| Primera visita del día | Sale de la sede y puede empezar a las 08:00. Si se indica un desplazamiento, la salida no puede ser antes de las 08:00 |
+| Cancelar | Nunca se bloquea. La visita siguiente cambia de origen y queda marcada "Revisar desplazamiento" |
+| Completar | Solo el técnico de la visita y a partir de su hora de inicio. Comentario de 10 a 2.000 caracteres; motivo de cancelación de 5 a 2.000 |
 
-`entorno.ps1` solo cambia el `PATH` de la sesión actual. No toca el PHP de XAMPP ni el `PATH` del sistema. Hay que cargarlo en cada terminal nueva.
+## Uso de la IA
 
-## Comandos
+He trabajado con Claude Code a partir de un análisis funcional que revisé yo, en fases cerradas:
+- **Tests primero:** se escribían antes del código y se comprobaba que fallaban.
+- **Puerta por fase:** cada fase tenía su puerta automática (`composer verify`) y mi aprobación antes de pasar a la siguiente.
+- **Tests de seguridad comprobados al revés:** se quitaba a propósito la protección (el `FOR UPDATE`, el token CSRF, la regeneración del id de sesión) para ver que el test fallaba.
 
-| Comando | Qué hace |
-| --- | --- |
-| `composer lint` | `php -l` sobre `src/`, `public/`, `bin/` y `tests/` |
-| `composer test:unit` | Tests sin base de datos |
-| `composer test:integration` | Tests contra `planificador_test` |
-| `composer test:api` | Tests HTTP contra un servidor PHP de pruebas |
-| `composer test` | Las tres suites |
-| `composer check:security` | `scripts/check-security.sh` |
-| `composer verify` | Todo lo anterior. Es la puerta mínima de cada fase |
-| `.\scripts\probar_interfaz.ps1` | Abre la página en Edge sin ventana y comprueba que el JavaScript carga, se ve el login y la consola no tiene errores (no forma parte de `composer verify`: necesita Edge) |
-
-Cobertura de la suite `unit` (requiere `pcov`): `php -d pcov.enabled=1 vendor/bin/phpunit --testsuite unit --coverage-text`. Lista legible de los tests: `php vendor/bin/phpunit --testsuite unit --testdox`.
+**Casos corregidos:**
+- **`CHECK` de fin de jornada:** el análisis generado lo calculaba con `TIME + INTERVAL`, que da la vuelta a medianoche (16:00 + 540 min = 01:00 y pasaba). Se calculó en minutos.
+- **Script de creación de bases:** una variable de PowerShell chocaba con un parámetro, porque PowerShell no distingue mayúsculas, y `psql` intentó entrar con el usuario de Windows. Lo detecté al ejecutarlo.
+- **Regla de 30 min:** al revisar el alcance contra el enunciado vi que la aplicación era más estricta que él. Exigía 30 min también desde la sede y dentro de la misma obra, así que ninguna visita podía empezar a las 08:00. Se corrigió antes de la entrega.
 
 ## API
 
-Todas las respuestas son JSON. Los errores tienen siempre la forma `{"errores": [{"regla", "mensaje", "campo"?}]}`.
+Todas las respuestas son JSON. Los errores tienen la forma `{"errores": [{"regla", "mensaje", "campo"?}]}`. Las reglas son `CAMPOS`, `SOLAPE`, `DESPLAZAMIENTO`, `JORNADA`, `PERMISO`, `ESTADO`, `NO_ENCONTRADO` e `INTERNO`.
 
-| Método | Ruta | Quién | Respuestas |
-| --- | --- | --- | --- |
-| POST | `/api/login` | Público (sin token CSRF) | 200 con `usuario` y `csrf`; 401 |
-| POST | `/api/logout` | Ambos | 204 |
-| GET | `/api/yo` | Ambos | 200 con `usuario` y `csrf`; 401 |
-| GET | `/api/tecnicos`, `/api/obras` | Planificador | 200; 403 |
-| GET | `/api/visitas?tecnico_id=&fecha=&estado=` | Ambos (al técnico se le fuerzan las suyas) | 200; 422 |
-| GET | `/api/agenda?tecnico_id=&fecha=` | Ambos (el técnico, solo la suya) | 200; 403; 422 |
-| POST | `/api/visitas/validar` | Planificador | 200 con `valida`, `origen`, `siguiente` y `errores` (no guarda nada) |
-| POST | `/api/visitas` | Planificador | 201 con `id`; 403; 422 |
-| POST | `/api/visitas/{id}/completar` con `comentario` | Técnico (las suyas) | 200; 403; 404; 409; 422 |
-| POST | `/api/visitas/{id}/cancelar` con `motivo` | Ambos (el técnico, las suyas) | 200; 403; 404; 409; 422 |
+| Método y ruta | Quién | Respuestas |
+| --- | --- | --- |
+| `POST /api/login`, `POST /api/logout`, `GET /api/yo` | Público / con sesión | 200 con `usuario` y `csrf`; 401 |
+| `GET /api/tecnicos`, `GET /api/obras` | Planificador | 200; 403 |
+| `GET /api/visitas?tecnico_id=&fecha=&estado=` | Ambos (el técnico solo ve las suyas) | 200; 422 |
+| `GET /api/agenda?tecnico_id=&fecha=` | Ambos (el técnico, solo la suya) | 200; 403; 422 |
+| `POST /api/visitas/validar` | Planificador | 200 con `valida`, `origen`, `siguiente` y `errores`; no guarda nada |
+| `POST /api/visitas` | Planificador | 201; 403; 422 |
+| `POST /api/visitas/{id}/completar` con `comentario` | Técnico (las suyas) | 200; 403; 404; 409; 422 |
+| `POST /api/visitas/{id}/cancelar` con `motivo` | Ambos (el técnico, las suyas) | 200; 403; 404; 409; 422 |
 
-Además: sin sesión, 401; JSON mal formado o sin `Content-Type: application/json`, 400; campos no esperados, 422; POST sin la cabecera `X-CSRF-Token` (salvo el login) o desde otro sitio (`Origin`), 403.
+Otros casos:
+- sin sesión, 401;
+- JSON mal formado o sin `Content-Type: application/json`, 400;
+- POST sin la cabecera `X-CSRF-Token`, salvo el login, 403.
 
-### Probar la API con curl
+## Despliegue
 
-Así se comprueba que las reglas y los permisos no dependen del navegador. Con la base recién cargada (`.\scripts\recrear_bd.ps1`) y el servidor en marcha en otra terminal (`.\scripts\servidor.ps1`), en PowerShell:
-
-```powershell
-. .\scripts\entorno.ps1            # carga DEMO_PASSWORD de .env
-$api = 'http://localhost:8081/api'
-$cookies = Join-Path $env:TEMP 'planificador_cookies.txt'
-$peticion = Join-Path $env:TEMP 'planificador_peticion.json'
-function Enviar([string]$ruta, $datos, [string]$token = '') {
-    # El JSON va en un archivo temporal (UTF-8 sin BOM) que se borra justo después.
-    [IO.File]::WriteAllText($peticion, ($datos | ConvertTo-Json -Compress))
-    curl.exe -s -w "`nHTTP %{http_code}`n" -b $cookies -c $cookies -H 'Content-Type: application/json' -H "X-CSRF-Token: $token" --data-binary "@$peticion" "$api$ruta"
-    Remove-Item $peticion
-}
-
-# 1. Entrar como planificador y quedarse con el token CSRF
-$token = ((Enviar '/login' @{ email = 'planificador@demo.local'; password = $env:DEMO_PASSWORD }) | Select-Object -First 1 | ConvertFrom-Json).csrf
-
-# 2. Regla de 30 min entre obras diferentes. Primero una visita válida a las 08:00 en la obra 1, sin
-#    desplazamiento desde la sede: HTTP 201 (si ya existe de una ejecución anterior: 422 SOLAPE).
-#    Después otra a las 09:00 en la obra 2 con 20 min: HTTP 422 "El desplazamiento mínimo es 30 min" y no se guarda.
-$fecha = (Get-Date).AddDays(30).ToString('yyyy-MM-dd')
-Enviar '/visitas' @{ tecnico_id = 4; obra_id = 1; fecha = $fecha; hora_inicio = '08:00'; duracion_min = 60; desplazamiento_min = 0 } $token
-Enviar '/visitas' @{ tecnico_id = 4; obra_id = 2; fecha = $fecha; hora_inicio = '09:00'; duracion_min = 60; desplazamiento_min = 20 } $token
-
-# 3. Ana intenta cancelar la visita 6, que es de Bernat: HTTP 403 "No tienes permiso para modificar esta visita"
-Remove-Item $cookies
-$token = ((Enviar '/login' @{ email = 'ana@demo.local'; password = $env:DEMO_PASSWORD }) | Select-Object -First 1 | ConvertFrom-Json).csrf
-Enviar '/visitas/6/cancelar' @{ motivo = 'Prueba de permisos' } $token
-
-Remove-Item $cookies
-```
-
-## Despliegue (Render + Neon)
-
-La aplicación se publica como contenedor Docker (`php:8.3-apache`) en Render, con la base de datos en Neon. Archivos: `Dockerfile`, `docker/` (Apache, PHP y script de arranque), `render.yaml` y `.dockerignore`. Ninguno contiene secretos: `DATABASE_URL` y `DEMO_PASSWORD` se introducen en el panel de Render.
-
-Los pasos completos (crear la base y los usuarios en Neon, subir el repositorio a GitHub, crear el servicio en Render y comprobarlo) están en **[docs/guia-despliegue.md](docs/guia-despliegue.md)**, junto con la lista de diferencias entre desarrollo y producción.
-
-> **Arranque en frío:** en el plan gratuito, Render suspende el servicio tras 15 minutos sin uso y Neon también duerme la base. La primera petición después puede tardar 30–60 segundos; las siguientes son rápidas.
+- **Contenedor:** `Dockerfile` (`php:8.3-apache`), carpeta `docker/` y `render.yaml`. Ninguno contiene secretos: `DATABASE_URL` y `DEMO_PASSWORD` se configuran en el panel de Render.
+- **Base de datos en Neon:** se carga con los mismos `db/migrations/001_esquema.sql` y `db/seed.sql`, usando el usuario propietario. Los usuarios demo los crea el contenedor al arrancar.

@@ -6,7 +6,6 @@ vendor
 tests
 coverage
 .phpunit.cache
-docs
 scripts
 *.md
 phpunit.xml

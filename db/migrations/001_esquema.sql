@@ -1,10 +1,11 @@
--- Esquema completo del planificador de visitas (análisis, sección 5).
+-- Esquema completo del planificador de visitas.
 --
 -- Se ejecuta con el usuario propietario (planificador_admin), nunca con app_planificador.
--- Requisito: los roles planificador_admin y app_planificador ya existen
--- (en local los crea scripts/crear_bases.ps1; en Neon, a mano siguiendo el README).
+-- Requisito: los roles planificador_admin y app_planificador ya existen (db/crear_bases.sql).
 -- Este archivo es SQL plano, sin comandos de psql, para poder ejecutarlo también desde PHP.
 -- Las restricciones llevan nombre (ck_...) para identificar en los errores cuál ha fallado.
+
+SET client_encoding = 'UTF8';
 
 CREATE TABLE sede (
     id        SERIAL PRIMARY KEY,
@@ -59,8 +60,8 @@ CREATE TABLE visitas (
     cancelada_por          INT NULL REFERENCES usuarios (id),
     cancelada_en           TIMESTAMP NULL,
     CONSTRAINT ck_visitas_duracion       CHECK (duracion_min BETWEEN 15 AND 540),
-    -- 0–240: el mínimo de 30 solo se exige entre obras diferentes (desde la sede o en la misma obra es 0;
-    -- R1 y R2 del análisis). El mínimo de cada caso lo aplica ValidadorVisita.
+    -- 0–240: el mínimo de 30 solo se exige entre obras diferentes (desde la sede o en la misma obra es 0).
+    -- El mínimo de cada caso lo aplica ValidadorVisita.
     CONSTRAINT ck_visitas_desplazamiento CHECK (desplazamiento_min BETWEEN 0 AND 240),
     CONSTRAINT ck_visitas_origen_tipo    CHECK (origen_tipo IN ('SEDE', 'VISITA')),
     CONSTRAINT ck_visitas_estado         CHECK (estado IN ('Programada', 'Completada', 'Cancelada')),

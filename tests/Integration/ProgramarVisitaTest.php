@@ -60,7 +60,7 @@ final class ProgramarVisitaTest extends ServicioTest
         self::assertSame(60, $fila['desplazamiento_min']);
     }
 
-    #[TestDox('R1 en base de datos: dos visitas seguidas en la misma obra; la siguiente pasa a salir de la nueva con 0 min')]
+    #[TestDox('Misma obra en base de datos: dos visitas seguidas en la misma obra; la siguiente pasa a salir de la nueva con 0 min')]
     public function testMismaObraEncadenada(): void
     {
         $existente = $this->insertarVisita(); // 10:00–11:00 en la obra 1, 30 min desde la sede
@@ -72,7 +72,7 @@ final class ProgramarVisitaTest extends ServicioTest
         self::assertSame(['VISITA', $id, 0], [$siguiente['origen_tipo'], $siguiente['origen_visita_id'], $siguiente['desplazamiento_min']]);
     }
 
-    #[TestDox('R2 en base de datos: la primera visita del día puede empezar a las 08:00 sin desplazamiento')]
+    #[TestDox('Desde la sede en base de datos: la primera visita del día puede empezar a las 08:00 sin desplazamiento')]
     public function testPrimeraVisitaALas08(): void
     {
         $id = $this->servicio()->programar($this->planificador, $this->datos('08:00', 540, ['desplazamiento_min' => 0]));

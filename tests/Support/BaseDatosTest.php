@@ -24,7 +24,7 @@ abstract class BaseDatosTest extends TestCase
     {
         $url = getenv($variable);
         if ($url === false || $url === '') {
-            throw new RuntimeException("Falta la variable de entorno {$variable}. Carga el entorno con . .\\scripts\\entorno.ps1");
+            throw new RuntimeException("Falta la variable de entorno {$variable} (ver README, apartado Tests)");
         }
         // Protección: los tests nunca deben tocar la base de desarrollo.
         $base = trim((string) parse_url($url, PHP_URL_PATH), '/');
@@ -51,7 +51,7 @@ abstract class BaseDatosTest extends TestCase
         $raiz = dirname(__DIR__, 2);
         $pdo->exec('DROP SCHEMA IF EXISTS public CASCADE');
         $pdo->exec('CREATE SCHEMA public');
-        // Todas las migraciones de db/migrations, en orden, como recrear_bd.ps1.
+        // Todas las migraciones de db/migrations, en orden.
         $migraciones = glob($raiz . '/db/migrations/*.sql') ?: [];
         sort($migraciones);
         foreach ($migraciones as $migracion) {

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Comprobaciones estáticas de seguridad (CLAUDE.md, apartado 3).
+# Comprobaciones estáticas de seguridad (composer check:security).
 # Sale con código 1 si encuentra algún problema. No se debe desactivar ninguna comprobación.
 
 set -u
@@ -75,7 +75,7 @@ patron_display=$(cat <<'FIN'
 display_errors["']?[[:space:]]*(=|,)[[:space:]]*["']?(on|1|true|stdout|stderr)\b
 FIN
 )
-salida=$(archivos_proyecto | grep -zEv '^(scripts/check-security\.sh|CLAUDE\.md|docs/.*)$' | xargs -0 -r grep -nIiE -- "$patron_display" 2> /dev/null)
+salida=$(archivos_proyecto | grep -zEv '^scripts/check-security\.sh$' | xargs -0 -r grep -nIiE -- "$patron_display" 2> /dev/null)
 [ -n "$salida" ] && informar "display_errors activado" "$salida"
 
 if [ "$fallos" -gt 0 ]; then

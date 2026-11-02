@@ -6,7 +6,8 @@ namespace App;
 
 /**
  * Token anti-CSRF: se genera al iniciar sesión, se guarda en la sesión y el navegador lo envía
- * en la cabecera X-CSRF-Token en cada POST (salvo el login, ver CLAUDE.md, premisa 4).
+ * en la cabecera X-CSRF-Token en cada POST. El login no lo lleva: lo compensan el JSON
+ * obligatorio, el rechazo de un Origin ajeno y la cookie SameSite=Strict.
  */
 final class Csrf
 {

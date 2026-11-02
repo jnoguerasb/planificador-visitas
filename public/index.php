@@ -49,7 +49,7 @@ try {
     $rutas = [
         Ruta::publica('GET', '#^/$#', static fn (): Respuesta => Respuesta::html((string) file_get_contents(__DIR__ . '/index.html'))),
 
-        // Sin token CSRF: excepción aprobada (CLAUDE.md, premisa 4). Devuelve el token nuevo.
+        // Sin token CSRF (lo compensan el JSON obligatorio, el control de Origin y SameSite=Strict). Devuelve el token nuevo.
         Ruta::publica('POST', '#^/api/login$#', static function (Peticion $p) use ($auth): Respuesta {
             $datos = $p->json(['email', 'password']);
 

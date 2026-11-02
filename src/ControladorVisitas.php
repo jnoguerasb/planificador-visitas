@@ -119,7 +119,7 @@ final class ControladorVisitas
             'inicio' => Horas::aTexto($resultado->siguiente->inicio),
             // Valor propuesto: 0 si es la misma obra; si no, el que ya tenía, como mínimo 30.
             'desplazamiento_min' => $resultado->desplazamientoSiguienteSugerido ?? $resultado->siguiente->desplazamiento,
-            // El campo "desplazamiento hasta la siguiente" solo se pide si es en otra obra (CU2, paso 5).
+            // El campo "desplazamiento hasta la siguiente" solo se pide si es en otra obra.
             'pedir_desplazamiento' => $resultado->siguiente->obraId !== ($datos['obra_id'] ?? null),
         ];
 

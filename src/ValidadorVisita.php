@@ -38,7 +38,7 @@ final class ValidadorVisita
             [$anterior, $siguiente] = $this->vecinas($activas, Horas::aMinutos($datos['hora_inicio']));
         }
 
-        // Mínimos de desplazamiento (R1 y R2): también se informan con errores, para la previsualización.
+        // Mínimos de desplazamiento (Reglas::desplazamientoMinimo): también se informan con errores, para la previsualización.
         $obraId = is_int($datos['obra_id'] ?? null) && array_key_exists($datos['obra_id'], $obras) ? $datos['obra_id'] : null;
         $minimoLlegada = self::minimoDeLlegada($anterior, $obraId);
         $minimoSalida = $siguiente === null || $obraId === null
@@ -77,7 +77,7 @@ final class ValidadorVisita
         return new ResultadoValidacion($errores, $visita, $anterior, $siguiente, $desplazamientoSiguiente, true, $minimoInformado, $sugeridoSiguiente);
     }
 
-    /** Desde la sede no hay mínimo (R2); si la obra aún no es válida, se aplica el mínimo entre obras. */
+    /** Desde la sede no hay mínimo; si la obra aún no es válida, se aplica el mínimo entre obras. */
     private static function minimoDeLlegada(?Visita $anterior, ?int $obraId): int
     {
         if ($anterior === null) {

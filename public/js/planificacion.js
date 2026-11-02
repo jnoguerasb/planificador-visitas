@@ -26,7 +26,7 @@ export async function iniciarPlanificacion() {
     iniciada = true;
 
     const formulario = porId('form-visita');
-    // El formulario propone hoy; el listado empieza sin filtros (todas las visitas, CU1).
+    // El formulario propone hoy; el listado empieza sin filtros: todas las visitas.
     porId('campo-fecha').value = hoy();
 
     formulario.addEventListener('input', programarPrevisualizacion);
@@ -170,7 +170,7 @@ function mostrarOrigen(texto) {
     porId('texto-origen').textContent = texto;
 }
 
-/** Campo "Desplazamiento hasta la siguiente": solo si el servidor lo pide (otra obra, CU2 paso 5). */
+/** Campo "Desplazamiento hasta la siguiente": solo si el servidor lo pide (otra obra). */
 function mostrarSiguiente(siguiente) {
     const grupo = porId('grupo-siguiente');
     if (!siguiente || !siguiente.pedir_desplazamiento) {

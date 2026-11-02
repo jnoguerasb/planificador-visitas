@@ -30,7 +30,7 @@ function emailDeTecnico(string $nombre): string
 
 $clave = getenv('DEMO_PASSWORD');
 if ($clave === false || $clave === '') {
-    fwrite(STDERR, "Error: falta la variable de entorno DEMO_PASSWORD. Defínela en .env y carga el entorno.\n");
+    fwrite(STDERR, "Error: falta la variable de entorno DEMO_PASSWORD. Defínela antes de ejecutar el script.\n");
     exit(1);
 }
 

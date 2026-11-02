@@ -10,6 +10,8 @@
 --   visita 11: desplazamiento máximo (240 min)
 --   visita 12: desplazamiento de 60 desde la sede, salida a las 08:00 justas
 
+SET client_encoding = 'UTF8';
+
 INSERT INTO sede (id, nombre, direccion, municipio) VALUES
     (1, 'Sede central', 'Carrer de la Indústria, 25', 'Sabadell');
 

@@ -20,7 +20,7 @@ final class CalculadoraAgendaTest extends TestCase
     }
 
     #[TestDox('Ejemplo de la sección 6: visita de 09:00 a 10:30 con 40 min de desplazamiento')]
-    public function testEjemploDelAnalisis(): void
+    public function testEjemploDeLasReglas(): void
     {
         self::assertSame(
             [['08:00', '08:20', 20], ['10:30', '17:00', 390]],

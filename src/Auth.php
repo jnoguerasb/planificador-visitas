@@ -8,7 +8,7 @@ use Closure;
 use SensitiveParameter;
 
 /**
- * Login, sesión y logout (premisa de seguridad 5).
+ * Login, sesión y logout.
  *
  * - Cookie de sesión con Secure, HttpOnly y SameSite=Strict en todos los entornos; solo lleva el id.
  * - session.use_strict_mode: un id de sesión inventado por el navegador no se acepta.

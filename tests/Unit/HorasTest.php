@@ -17,7 +17,7 @@ final class HorasTest extends TestCase
         return [
             'medianoche' => ['00:00', 0],
             'inicio de jornada' => ['08:00', 480],
-            'ejemplo del análisis' => ['10:30', 630],
+            'ejemplo de las reglas' => ['10:30', 630],
             'fin de jornada' => ['17:00', 1020],
             'último minuto del día' => ['23:59', 1439],
         ];
