@@ -66,7 +66,7 @@ final class RestriccionesTest extends BaseDatosTest
         return [
             'duración 0' => [['duracion_min' => 0], 'ck_visitas_duracion'],
             'duración 541' => [['hora_inicio' => '08:00', 'duracion_min' => 541], 'ck_visitas_duracion'],
-            'desplazamiento 29' => [['desplazamiento_min' => 29], 'ck_visitas_desplazamiento'],
+            'desplazamiento negativo' => [['desplazamiento_min' => -1], 'ck_visitas_desplazamiento'],
             'desplazamiento 241' => [['desplazamiento_min' => 241], 'ck_visitas_desplazamiento'],
             'inicio 07:59' => [['hora_inicio' => '07:59'], 'ck_visitas_hora_inicio'],
             'fin 17:01' => [['hora_inicio' => '16:01', 'duracion_min' => 60], 'ck_visitas_fin_jornada'],
@@ -92,6 +92,7 @@ final class RestriccionesTest extends BaseDatosTest
         return [
             'duración 15' => [['duracion_min' => 15]],
             'duración 540 desde las 08:00' => [['hora_inicio' => '08:00', 'duracion_min' => 540]],
+            'desplazamiento 0 (desde la sede o en la misma obra)' => [['desplazamiento_min' => 0]],
             'desplazamiento 30' => [['desplazamiento_min' => 30]],
             'desplazamiento 240' => [['desplazamiento_min' => 240]],
             'inicio 08:00' => [['hora_inicio' => '08:00']],

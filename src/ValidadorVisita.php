@@ -10,7 +10,8 @@ namespace App;
  * 1. Campos. Si hay errores de CAMPOS, se devuelven sin evaluar el resto.
  * 2. Jornada: empezar no antes de las 08:00, salir de la sede no antes de las 08:00 y acabar no después de las 17:00.
  * 3. Solape: contra todas las visitas activas del técnico ese día.
- * 4. Llegada: desde la visita anterior, con el desplazamiento de la nueva.
+ * 4. Llegada: desde la visita anterior, con el desplazamiento de la nueva (mínimo 30 entre obras
+ *    diferentes; 0 desde la sede o en la misma obra, ver Reglas::desplazamientoMinimo).
  * 5. Salida: hasta la visita siguiente, con su desplazamiento.
  *
  * Intervalos semiabiertos [inicio, fin). Si la nueva solapa con la anterior o la siguiente, no se
@@ -37,9 +38,22 @@ final class ValidadorVisita
             [$anterior, $siguiente] = $this->vecinas($activas, Horas::aMinutos($datos['hora_inicio']));
         }
 
-        $errores = $this->validarCampos($datos, $tecnicos, $obras, $anterior, $siguiente);
+        // Mínimos de desplazamiento (R1 y R2): también se informan con errores, para la previsualización.
+        $obraId = is_int($datos['obra_id'] ?? null) && array_key_exists($datos['obra_id'], $obras) ? $datos['obra_id'] : null;
+        $minimoLlegada = self::minimoDeLlegada($anterior, $obraId);
+        $minimoSalida = $siguiente === null || $obraId === null
+            ? Reglas::DESPLAZAMIENTO_MINIMO
+            : Reglas::desplazamientoMinimo($obraId, $siguiente->obraId);
+        $minimoInformado = $origenConocido && ($anterior === null || $obraId !== null) ? $minimoLlegada : null;
+        // Lo que tendrá la siguiente si no se indica otro valor: en la misma obra, 0; si no, el que ya
+        // tenía, pero nunca menos del mínimo (pudo salir antes de la sede con menos).
+        $sugeridoSiguiente = $siguiente === null || $obraId === null
+            ? null
+            : ($minimoSalida === 0 ? 0 : max($siguiente->desplazamiento, $minimoSalida));
+
+        $errores = $this->validarCampos($datos, $tecnicos, $obras, $minimoLlegada, $minimoSalida);
         if ($errores !== []) {
-            return new ResultadoValidacion($errores, null, $anterior, $siguiente, null, $origenConocido);
+            return new ResultadoValidacion($errores, null, $anterior, $siguiente, null, $origenConocido, $minimoInformado, $sugeridoSiguiente);
         }
 
         $visita = new Visita(
@@ -56,11 +70,21 @@ final class ValidadorVisita
         );
         $desplazamientoSiguiente = $siguiente === null
             ? null
-            : ($datos['desplazamiento_siguiente_min'] ?? $siguiente->desplazamiento);
+            : ($datos['desplazamiento_siguiente_min'] ?? $sugeridoSiguiente);
 
         $errores = $this->validarReglas($visita, $activas, $anterior, $siguiente, $desplazamientoSiguiente);
 
-        return new ResultadoValidacion($errores, $visita, $anterior, $siguiente, $desplazamientoSiguiente, true);
+        return new ResultadoValidacion($errores, $visita, $anterior, $siguiente, $desplazamientoSiguiente, true, $minimoInformado, $sugeridoSiguiente);
+    }
+
+    /** Desde la sede no hay mínimo (R2); si la obra aún no es válida, se aplica el mínimo entre obras. */
+    private static function minimoDeLlegada(?Visita $anterior, ?int $obraId): int
+    {
+        if ($anterior === null) {
+            return 0;
+        }
+
+        return $obraId === null ? Reglas::DESPLAZAMIENTO_MINIMO : Reglas::desplazamientoMinimo($anterior->obraId, $obraId);
     }
 
     /**
@@ -69,7 +93,7 @@ final class ValidadorVisita
      * @param array<int, string> $obras
      * @return list<ErrorRegla>
      */
-    private function validarCampos(array $datos, array $tecnicos, array $obras, ?Visita $anterior, ?Visita $siguiente): array
+    private function validarCampos(array $datos, array $tecnicos, array $obras, int $minimoLlegada, int $minimoSalida): array
     {
         $errores = [];
 
@@ -81,7 +105,6 @@ final class ValidadorVisita
         $obraId = $datos['obra_id'] ?? null;
         if (!is_int($obraId) || !array_key_exists($obraId, $obras)) {
             $errores[] = new ErrorRegla(ErrorRegla::CAMPOS, 'Elige una obra válida', 'obra_id');
-            $obraId = null;
         }
 
         if (!self::esFechaValida($datos['fecha'] ?? null)) {
@@ -101,16 +124,14 @@ final class ValidadorVisita
             );
         }
 
-        $minimo = Reglas::desplazamientoMinimo($anterior?->obraId, $obraId);
-        $error = $this->validarDesplazamiento($datos['desplazamiento_min'] ?? null, $minimo, 'desplazamiento_min');
+        $error = $this->validarDesplazamiento($datos['desplazamiento_min'] ?? null, $minimoLlegada, 'desplazamiento_min');
         if ($error !== null) {
             $errores[] = $error;
         }
 
         // "Desplazamiento hasta la siguiente" es opcional; si llega, cumple el mismo criterio.
         if (($datos['desplazamiento_siguiente_min'] ?? null) !== null) {
-            $minimo = Reglas::desplazamientoMinimo($obraId, $siguiente?->obraId);
-            $error = $this->validarDesplazamiento($datos['desplazamiento_siguiente_min'], $minimo, 'desplazamiento_siguiente_min');
+            $error = $this->validarDesplazamiento($datos['desplazamiento_siguiente_min'], $minimoSalida, 'desplazamiento_siguiente_min');
             if ($error !== null) {
                 $errores[] = $error;
             }
@@ -121,11 +142,16 @@ final class ValidadorVisita
 
     /**
      * Un valor vacío, que no sea entero o menor del mínimo se rechaza; nunca se corrige.
+     * El mínimo es 30 entre obras diferentes y 0 desde la sede o en la misma obra.
      */
     private function validarDesplazamiento(mixed $valor, int $minimo, string $campo): ?ErrorRegla
     {
-        if (!is_int($valor) || $valor < $minimo) {
-            return new ErrorRegla(ErrorRegla::CAMPOS, "El desplazamiento mínimo es {$minimo} min", $campo);
+        $mensajeMinimo = $minimo > 0 ? "El desplazamiento mínimo es {$minimo} min" : null;
+        if (!is_int($valor)) {
+            return new ErrorRegla(ErrorRegla::CAMPOS, $mensajeMinimo ?? 'Indica el desplazamiento en minutos', $campo);
+        }
+        if ($valor < $minimo || $valor < 0) {
+            return new ErrorRegla(ErrorRegla::CAMPOS, $mensajeMinimo ?? 'El desplazamiento no puede ser negativo', $campo);
         }
         if ($valor > Reglas::DESPLAZAMIENTO_MAXIMO) {
             return new ErrorRegla(ErrorRegla::CAMPOS, sprintf('El desplazamiento no puede superar %d min', Reglas::DESPLAZAMIENTO_MAXIMO), $campo);

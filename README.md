@@ -8,7 +8,7 @@ Aplicación web para planificar las visitas de los técnicos a las obras. PHP 8.
 
 - **Planificador** (`planificador@demo.local`): programa visitas viendo la agenda del técnico. La visita propuesta aparece en verde si cabe y en rojo si choca, antes de guardar. También filtra el listado y cancela visitas con motivo.
 - **Técnico** (`ana@demo.local`…): ve su agenda día a día y completa (con comentario) o cancela (con motivo) sus visitas.
-- Reglas: sin solapes, dentro de la jornada de 08:00 a 17:00, y con tiempo para desplazarse desde la sede o desde la visita anterior (mínimo 30 min) y hasta la siguiente.
+- Reglas: sin solapes, dentro de la jornada de 08:00 a 17:00, y con al menos 30 min de desplazamiento entre visitas a obras diferentes (desde la sede o en la misma obra no hay mínimo).
 
 ## Requisitos (Windows)
 
@@ -118,8 +118,12 @@ function Enviar([string]$ruta, $datos, [string]$token = '') {
 # 1. Entrar como planificador y quedarse con el token CSRF
 $token = ((Enviar '/login' @{ email = 'planificador@demo.local'; password = $env:DEMO_PASSWORD }) | Select-Object -First 1 | ConvertFrom-Json).csrf
 
-# 2. Visita inválida (desplazamiento 20): HTTP 422 y "El desplazamiento mínimo es 30 min"; no se guarda nada
-Enviar '/visitas' @{ tecnico_id = 1; obra_id = 2; fecha = (Get-Date).AddDays(7).ToString('yyyy-MM-dd'); hora_inicio = '12:00'; duracion_min = 60; desplazamiento_min = 20 } $token
+# 2. Regla de 30 min entre obras diferentes. Primero una visita válida a las 08:00 en la obra 1, sin
+#    desplazamiento desde la sede: HTTP 201 (si ya existe de una ejecución anterior: 422 SOLAPE).
+#    Después otra a las 09:00 en la obra 2 con 20 min: HTTP 422 "El desplazamiento mínimo es 30 min" y no se guarda.
+$fecha = (Get-Date).AddDays(30).ToString('yyyy-MM-dd')
+Enviar '/visitas' @{ tecnico_id = 4; obra_id = 1; fecha = $fecha; hora_inicio = '08:00'; duracion_min = 60; desplazamiento_min = 0 } $token
+Enviar '/visitas' @{ tecnico_id = 4; obra_id = 2; fecha = $fecha; hora_inicio = '09:00'; duracion_min = 60; desplazamiento_min = 20 } $token
 
 # 3. Ana intenta cancelar la visita 6, que es de Bernat: HTTP 403 "No tienes permiso para modificar esta visita"
 Remove-Item $cookies

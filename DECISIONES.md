@@ -47,9 +47,9 @@ La API y las dos interfaces están cubiertas por 400 tests (`composer verify`). 
 | --- | --- |
 | ¿Pueden tocarse dos visitas? | Sí: intervalos `[inicio, fin)` |
 | Visitas activas | Programadas y Completadas ocupan su horario; las Canceladas lo liberan |
-| Desplazamiento | Entre 30 y 240 min. Un valor menor se **rechaza** ("El desplazamiento mínimo es 30 min"), nunca se corrige |
-| **R1. Misma obra** | También exige 30 min. Es más estricto que el enunciado; pendiente de confirmar con negocio |
-| **R2. Salida desde la sede** | Cuenta dentro de la jornada con el mínimo de 30, así que nada empieza antes de las 08:30. Consecuencia: la duración máxima de 540 min no cabe nunca (el máximo útil es 510). Pendiente de negocio; cambiarlo afecta solo a `Reglas::desplazamientoMinimo` |
+| Desplazamiento | Hasta 240 min. Entre obras diferentes, al menos 30: un valor menor se **rechaza** ("El desplazamiento mínimo es 30 min"), nunca se corrige |
+| **R1. Misma obra** | Sin mínimo: dos visitas seguidas en la misma obra pueden ir pegadas (regla b del enunciado: 30 min solo entre obras diferentes) |
+| **R2. Salida desde la sede** | Sin mínimo: la primera visita puede empezar a las 08:00 (regla c). Si se indica un desplazamiento desde la sede, la salida no puede ser antes de las 08:00 |
 | Cancelar | Nunca se bloquea. La siguiente cambia de origen y queda marcada "Revisar desplazamiento" |
 | Completar | Solo el técnico de la visita, a partir de su hora de inicio. Comentario de 10 a 2.000 caracteres; motivo de cancelación de 5 a 2.000 |
 | Estados finales | Completada y Cancelada no se reactivan ni se borran |
@@ -69,4 +69,4 @@ El código lo ha escrito Claude Code siguiendo `CLAUDE.md`:
 2. **`crear_bases.ps1`:** una variable chocaba con un parámetro, porque PowerShell no distingue mayúsculas, y psql intentó entrar con el usuario de Windows. Lo detectó la persona al ejecutarlo. Se corrigió y se añadió una comprobación para que no vuelva a pasar.
 3. **Dos `CHECK` que se solapaban:** un test de restricciones falló. Se corrigió el `CHECK`, no el test.
 4. **Longitud del motivo:** la IA puso 2.000 caracteres sin ver que el análisis decía 500. Lo detectó en una revisión posterior y la persona decidió mantener 2.000 y corregir el análisis.
-5. **Los 540 minutos:** al escribir los tests se descubrió que, con R2, una visita de 540 min nunca cabe en la jornada.
+5. **R1 y R2:** al revisar el alcance contra el enunciado se vio que la aplicación era más estricta que él (no permitía empezar a las 08:00 ni encadenar visitas en la misma obra). Se ajustó antes de la entrega; también resolvió que una visita de 540 min no cupiera nunca.

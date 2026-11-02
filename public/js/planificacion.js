@@ -16,6 +16,7 @@ let numeroPeticion = 0;          // para descartar respuestas que llegan tarde
 let agendaActual = null;          // última agenda cargada
 let claveAgenda = '';             // "tecnico|fecha" de la agenda cargada
 let siguienteMostrada = null;     // id de la visita siguiente cuyo campo se está mostrando
+let desplazamientoEditado = false; // si el usuario ha escrito el desplazamiento, ya no se le propone el mínimo
 
 export async function iniciarPlanificacion() {
     if (iniciada) {
@@ -29,6 +30,9 @@ export async function iniciarPlanificacion() {
     porId('campo-fecha').value = hoy();
 
     formulario.addEventListener('input', programarPrevisualizacion);
+    porId('campo-desplazamiento').addEventListener('input', () => {
+        desplazamientoEditado = true;
+    });
     formulario.addEventListener('change', programarPrevisualizacion);
     formulario.addEventListener('submit', guardar);
     porId('form-filtros').addEventListener('change', cargarListado);
@@ -126,9 +130,24 @@ async function previsualizar() {
 }
 
 function mostrarResultado(datos, resultado) {
+    // El mínimo lo decide el servidor: 0 desde la sede o en la misma obra, 30 desde otra obra.
+    // Mientras el usuario no escriba otro valor, se le propone ese mínimo y se vuelve a validar.
+    const campo = porId('campo-desplazamiento');
+    const minimo = resultado.desplazamiento_minimo;
+    if (minimo !== null) {
+        campo.setAttribute('min', String(minimo));
+        if (!desplazamientoEditado && campo.value !== String(minimo)) {
+            campo.value = String(minimo);
+            previsualizar();
+            return;
+        }
+    }
+
     const formulario = porId('form-visita');
     repartirErrores(formulario, porId('errores-visita'), resultado.errores);
-    mostrarOrigen(resultado.origen ? resultado.origen.texto : 'Elige la hora para ver desde dónde sale.');
+    mostrarOrigen(resultado.origen
+        ? `${resultado.origen.texto}${minimo === null ? '' : ` · desplazamiento mínimo ${minimo} min`}`
+        : 'Elige la hora para ver desde dónde sale.');
     mostrarSiguiente(resultado.siguiente);
 
     // La franja se dibuja con los datos del formulario; si cabe o no, lo ha dicho el servidor.
@@ -189,6 +208,7 @@ async function guardar(evento) {
         porId('campo-hora').value = '';
         porId('grupo-siguiente').hidden = true;
         siguienteMostrada = null;
+        desplazamientoEditado = false;
         await Promise.all([refrescarAgenda(), cargarListado()]);
     } catch (error) {
         repartirErrores(formulario, porId('errores-visita'), error.errores ?? []);

@@ -73,6 +73,7 @@ CREATE ROLE app_planificador LOGIN;
 \getenv clave CLAVE_APP
 SELECT format('ALTER ROLE app_planificador WITH PASSWORD %L', :'clave') \gexec
 \i db/migrations/001_esquema.sql
+\i db/migrations/002_desplazamiento_minimo.sql
 \i db/seed.sql
 SELECT count(*) AS visitas FROM visitas;
 \q
@@ -80,7 +81,7 @@ SELECT count(*) AS visitas FROM visitas;
 
 Respuestas esperadas:
 - `CREATE ROLE` y `ALTER ROLE`; la contraseña no aparece en ninguna.
-- `CREATE TABLE` cinco veces, `CREATE INDEX` dos y `GRANT` tres.
+- `CREATE TABLE` cinco veces, `CREATE INDEX` dos y `GRANT` tres; luego `ALTER TABLE` dos veces (migración 002).
 - Los `INSERT` y `visitas = 12`.
 
 La migración ya da a `app_planificador` solo `SELECT`, `INSERT` y `UPDATE`. Al salir, borra la variable temporal: `Remove-Item Env:CLAVE_APP; Remove-Variable s`.
@@ -88,6 +89,17 @@ La migración ya da a `app_planificador` solo `SELECT`, `INSERT` y `UPDATE`. Al 
 > - Si `CREATE ROLE` da "permiso denegado": sal con `\q` y vuelve a entrar con `user=neondb_owner` (su contraseña está en *Connect*). Haz allí `CREATE ROLE`, `\getenv` y el `ALTER ROLE`, y vuelve a entrar como `planificador_admin` para los `\i`.
 > - Si Neon rechaza la contraseña por débil (*entropy*), elige una más larga.
 > - Si un `\i` falla a mitad y hay que repetirlo, empieza de cero con `DROP SCHEMA public CASCADE; CREATE SCHEMA public;` (como `planificador_admin`).
+**A6 bis. Si ya cargaste la base antes del 02/11/2026** (sin la migración 002), aplícala sola. No borra datos:
+
+```powershell
+. .\scripts\entorno.ps1
+$neon = 'ep-algo-123456.eu-central-1.aws.neon.tech'       # <-- tu host
+$env:PGCLIENTENCODING = 'UTF8'
+psql "host=$neon dbname=planificador user=planificador_admin sslmode=require" -f db/migrations/002_desplazamiento_minimo.sql
+```
+
+Debe responder `ALTER TABLE` dos veces.
+
 **A7. Comprobar que la aplicación no puede borrar.**
 
 ```powershell
@@ -172,7 +184,7 @@ Más adelante, cuando Claude Code termine las fases que quedan, bastará con `gi
 $env:DEMO_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR((Read-Host 'DEMO_PASSWORD de producción' -AsSecureString)))
 ```
 
-El paso 2 del bloque debe dar `HTTP 422` con "El desplazamiento mínimo es 30 min", y el paso 3, `HTTP 403`.
+El paso 2 del bloque debe dar primero `HTTP 201` (o `422` con `SOLAPE` si ya lo habías ejecutado) y después `HTTP 422` con "El desplazamiento mínimo es 30 min"; el paso 3, `HTTP 403`. El paso 2 deja guardada una visita de David dentro de 30 días: es una visita de demostración.
 
 **D5.** Cuéntale a Claude Code el resultado de D1–D4. **Sin contraseñas.**
 

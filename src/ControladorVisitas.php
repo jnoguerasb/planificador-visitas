@@ -96,7 +96,8 @@ final class ControladorVisitas
 
     /**
      * POST /api/visitas/validar. Siempre 200 si la petición se puede leer: los errores de las reglas
-     * son el resultado de la previsualización, junto con el origen calculado y la visita siguiente.
+     * son el resultado de la previsualización, junto con el origen calculado, el desplazamiento
+     * mínimo y la visita siguiente.
      */
     public function validar(Peticion $peticion): Respuesta
     {
@@ -116,7 +117,8 @@ final class ControladorVisitas
             'id' => $resultado->siguiente->id,
             'obra' => $resultado->siguiente->obraNombre,
             'inicio' => Horas::aTexto($resultado->siguiente->inicio),
-            'desplazamiento_min' => $resultado->siguiente->desplazamiento,
+            // Valor propuesto: 0 si es la misma obra; si no, el que ya tenía, como mínimo 30.
+            'desplazamiento_min' => $resultado->desplazamientoSiguienteSugerido ?? $resultado->siguiente->desplazamiento,
             // El campo "desplazamiento hasta la siguiente" solo se pide si es en otra obra (CU2, paso 5).
             'pedir_desplazamiento' => $resultado->siguiente->obraId !== ($datos['obra_id'] ?? null),
         ];
@@ -124,6 +126,8 @@ final class ControladorVisitas
         return Respuesta::json(200, [
             'valida' => $resultado->esValida(),
             'origen' => $origen,
+            // Mínimo para llegar a la nueva: 0 desde la sede o en la misma obra, 30 desde otra obra.
+            'desplazamiento_minimo' => $resultado->desplazamientoMinimo,
             'siguiente' => $siguiente,
             'errores' => Respuesta::listaDeErrores($resultado->errores),
         ]);

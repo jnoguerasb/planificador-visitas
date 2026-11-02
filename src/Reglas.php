@@ -20,14 +20,19 @@ final class Reglas
     public const TEXTO_MAXIMO = 2000;
 
     /**
-     * Desplazamiento mínimo para ir de una obra a otra. $obraOrigenId es null si se sale de la sede;
-     * $obraDestinoId es null si aún no se conoce (obra no válida o sin visita siguiente).
+     * Desplazamiento mínimo para llegar a $obraId. $obraAnteriorId es null si se sale de la sede.
      *
-     * Puntos R1 y R2 del análisis, pendientes de decisión: hoy el mínimo es 30 siempre, también
-     * en la misma obra (R1) y desde la sede (R2). Si negocio decide otra cosa, solo cambia este método.
+     * Regla b del enunciado: 30 min entre visitas a obras diferentes. Puntos R1 y R2 del análisis,
+     * resueltos según el enunciado (02/11/2026): en la misma obra no hay mínimo (R1) y desde la
+     * sede tampoco (R2), así que una visita puede empezar a las 08:00. Si se indica un
+     * desplazamiento desde la sede, la salida sigue sin poder ser antes de las 08:00.
      */
-    public static function desplazamientoMinimo(?int $obraOrigenId, ?int $obraDestinoId): int
+    public static function desplazamientoMinimo(?int $obraAnteriorId, int $obraId): int
     {
+        if ($obraAnteriorId === null || $obraAnteriorId === $obraId) {
+            return 0;
+        }
+
         return self::DESPLAZAMIENTO_MINIMO;
     }
 }

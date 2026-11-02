@@ -38,9 +38,11 @@ final class ProgramarApiTest extends ApiTest
     #[TestDox('POST /api/visitas con desplazamiento 20: 422 "El desplazamiento mínimo es 30 min" y no guarda nada')]
     public function testDesplazamiento20(): void
     {
+        // Viene de la Obra 1 (10:00–11:00) y va a la Obra 2: entre obras diferentes el mínimo es 30.
+        $this->insertarVisita(['fecha' => '2030-04-02']);
         $antes = $this->numeroDeVisitas();
 
-        $respuesta = $this->postConToken('/api/visitas', $this->datos('2030-04-02', '12:00', ['desplazamiento_min' => 20]), $this->token);
+        $respuesta = $this->postConToken('/api/visitas', $this->datos('2030-04-02', '11:30', ['desplazamiento_min' => 20]), $this->token);
 
         self::assertSame(422, $respuesta['estado']);
         self::assertSame(['errores' => [
@@ -134,10 +136,28 @@ final class ProgramarApiTest extends ApiTest
         self::assertSame([
             'valida' => true,
             'origen' => ['tipo' => 'VISITA', 'visita_id' => $anterior, 'texto' => 'Desde Escuela Can Puiggener (acaba 11:00)'],
+            'desplazamiento_minimo' => 30,
             'siguiente' => ['id' => $siguiente, 'obra' => 'Nave logística Can Roqueta', 'inicio' => '15:00', 'desplazamiento_min' => 45, 'pedir_desplazamiento' => true],
             'errores' => [],
         ], $respuesta['json']);
         self::assertSame($antes, $this->numeroDeVisitas());
+    }
+
+    #[TestDox('POST /api/visitas/validar informa del desplazamiento mínimo: 0 desde la sede o en la misma obra, 30 desde otra obra')]
+    public function testValidarInformaDelMinimo(): void
+    {
+        $this->insertarVisita(['fecha' => '2030-04-14']); // 10:00–11:00 en la obra 1
+
+        $sede = $this->postConToken('/api/visitas/validar', $this->datos('2030-04-14', '08:00', ['desplazamiento_min' => 0]), $this->token);
+        $misma = $this->postConToken('/api/visitas/validar', $this->datos('2030-04-14', '11:00', ['obra_id' => 1, 'desplazamiento_min' => 0]), $this->token);
+        $otra = $this->postConToken('/api/visitas/validar', $this->datos('2030-04-14', '12:00', ['desplazamiento_min' => 0]), $this->token);
+
+        self::assertSame([true, 0], [$sede['json']['valida'], $sede['json']['desplazamiento_minimo']]);
+        self::assertSame([true, 0], [$misma['json']['valida'], $misma['json']['desplazamiento_minimo']]);
+        self::assertSame([false, 30], [$otra['json']['valida'], $otra['json']['desplazamiento_minimo']]);
+
+        // Y se guarda la primera visita del día a las 08:00 (enunciado, regla c).
+        self::assertSame(201, $this->postConToken('/api/visitas', $this->datos('2030-04-14', '08:00', ['desplazamiento_min' => 0]), $this->token)['estado']);
     }
 
     #[TestDox('POST /api/visitas/validar: misma obra que la siguiente, no se pide el desplazamiento hasta ella')]

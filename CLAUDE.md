@@ -51,7 +51,7 @@ El proyecto se construye en **fases cerradas**. Una fase solo termina cuando pas
 - **Idioma:** nombres de clases, métodos, variables, tablas y mensajes en español, como en el análisis (`ValidadorVisita`, `desplazamiento_min`). Comentarios en español, breves y solo donde aporten.
 - **Mantenibilidad:** la persona que mantendrá el código conoce HTML, CSS, JS, PHP y MySQL. Prioriza código simple y explícito frente a abstracciones. Una clase, una responsabilidad.
 - **Zona horaria:** `Europe/Madrid` siempre, sea cual sea la del servidor. La hora actual sale de `App\Reloj`, y `Database` fija la misma zona en cada conexión de PostgreSQL (`CURRENT_DATE`, marcas de tiempo).
-- **Constantes de negocio** en un único lugar (`src/Reglas.php`): `JORNADA_INICIO = 480`, `JORNADA_FIN = 1020`, `DESPLAZAMIENTO_MINIMO = 30`, `DESPLAZAMIENTO_MAXIMO = 240`, `DURACION_MINIMA = 15`, `DURACION_MAXIMA = 540`. Los puntos R1 y R2 del análisis (misma obra y salida desde la sede) están pendientes de decisión: implementa el comportamiento actual (mínimo de 30 siempre) de forma que cambiarlo afecte a un solo método.
+- **Constantes de negocio** en un único lugar (`src/Reglas.php`): `JORNADA_INICIO = 480`, `JORNADA_FIN = 1020`, `DESPLAZAMIENTO_MINIMO = 30`, `DESPLAZAMIENTO_MAXIMO = 240`, `DURACION_MINIMA = 15`, `DURACION_MAXIMA = 540`. Los puntos R1 y R2 del análisis (misma obra y salida desde la sede) se resolvieron el 02/11/2026 según el enunciado, con aprobación del usuario: el mínimo de 30 solo se exige entre obras diferentes; desde la sede o en la misma obra es 0. Toda la regla está en `Reglas::desplazamientoMinimo`.
 
 ### Comandos estándar
 
@@ -136,7 +136,7 @@ Validación manual: el usuario clona el repo en otra carpeta, sigue solo el READ
 **Objetivo:** esquema completo con todas sus restricciones y datos de ejemplo cargables.
 
 Tareas:
-- `db/migrations/001_esquema.sql` según la sección 5 del análisis: `sede`, `tecnicos`, `obras`, `usuarios`, `visitas`, índices y todos los `CHECK` (incluido `desplazamiento_min BETWEEN 30 AND 240` y el de fin de jornada calculado en minutos, nunca con `TIME + INTERVAL`).
+- `db/migrations/001_esquema.sql` según la sección 5 del análisis: `sede`, `tecnicos`, `obras`, `usuarios`, `visitas`, índices y todos los `CHECK` (incluido `desplazamiento_min BETWEEN 30 AND 240`, que la migración `002` cambió a 0–240 al resolver R1 y R2, y el de fin de jornada calculado en minutos, nunca con `TIME + INTERVAL`).
 - Creación del rol `app_planificador` con `GRANT SELECT, INSERT, UPDATE` sobre las tablas y `USAGE` sobre las secuencias; sin `DELETE`.
 - `db/seed.sql`: sede, 4 técnicos, 6 obras en 4 municipios, unas 12 visitas con fechas relativas a `CURRENT_DATE` (incluida una Completada con comentario, una Cancelada con motivo y casos límite de desplazamiento). Sin usuarios.
 - `bin/crear_usuarios_demo.php`: crea `planificador@demo.local` y un usuario por técnico con `DEMO_PASSWORD`; idempotente; falla con mensaje claro si la variable no existe.
@@ -144,7 +144,7 @@ Tareas:
 
 Tests (suite `integration`, escritos antes de dar la fase por buena):
 - El seed carga el número esperado de filas por tabla.
-- Cada `CHECK` rechaza su caso: duración 0 y 541, desplazamiento 29 y 241, inicio 07:59, fin 17:01, inicio 16:00 con 540 min (el caso de la vuelta a medianoche), estado inválido, Completada sin comentario, Cancelada sin motivo, origen `SEDE` con `origen_visita_id`, rol `TECNICO` sin `tecnico_id`.
+- Cada `CHECK` rechaza su caso: duración 0 y 541, desplazamiento 29 y 241 (desde la migración `002`: negativo y 241), inicio 07:59, fin 17:01, inicio 16:00 con 540 min (el caso de la vuelta a medianoche), estado inválido, Completada sin comentario, Cancelada sin motivo, origen `SEDE` con `origen_visita_id`, rol `TECNICO` sin `tecnico_id`.
 - Conectado como `app_planificador`, un `DELETE` sobre `visitas` falla por permisos.
 - `crear_usuarios_demo.php` es idempotente y guarda hashes, nunca la contraseña en claro.
 
@@ -295,6 +295,6 @@ Criterios de aceptación: el build de Docker en Render termina sin errores; la U
 
 - No añadir frameworks ni librerías de PHP o JS (solo PHPUnit en desarrollo) sin aprobación.
 - No cambiar el motor de base de datos, los nombres de tablas o los códigos de error del análisis.
-- No implementar funcionalidades de la lista de pendientes (sección 10 del análisis) ni resolver R1 y R2 por tu cuenta.
+- No implementar funcionalidades de la lista de pendientes (sección 10 del análisis) por tu cuenta. R1 y R2 ya están resueltos (02/11/2026, con aprobación).
 - No borrar datos: las visitas nunca se eliminan, solo cambian de estado.
 - No mostrar en la interfaz ni devolver en la API detalles técnicos de errores.

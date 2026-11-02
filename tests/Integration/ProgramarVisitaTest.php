@@ -60,6 +60,26 @@ final class ProgramarVisitaTest extends ServicioTest
         self::assertSame(60, $fila['desplazamiento_min']);
     }
 
+    #[TestDox('R1 en base de datos: dos visitas seguidas en la misma obra; la siguiente pasa a salir de la nueva con 0 min')]
+    public function testMismaObraEncadenada(): void
+    {
+        $existente = $this->insertarVisita(); // 10:00–11:00 en la obra 1, 30 min desde la sede
+
+        $id = $this->servicio()->programar($this->planificador, $this->datos('09:00', 60, ['obra_id' => 1, 'desplazamiento_min' => 0]));
+
+        self::assertSame(['SEDE', 0], [$this->fila($id)['origen_tipo'], $this->fila($id)['desplazamiento_min']]);
+        $siguiente = $this->fila($existente);
+        self::assertSame(['VISITA', $id, 0], [$siguiente['origen_tipo'], $siguiente['origen_visita_id'], $siguiente['desplazamiento_min']]);
+    }
+
+    #[TestDox('R2 en base de datos: la primera visita del día puede empezar a las 08:00 sin desplazamiento')]
+    public function testPrimeraVisitaALas08(): void
+    {
+        $id = $this->servicio()->programar($this->planificador, $this->datos('08:00', 540, ['desplazamiento_min' => 0]));
+
+        self::assertSame(['08:00', 540, 0], [$this->fila($id)['inicio'], $this->fila($id)['duracion_min'], $this->fila($id)['desplazamiento_min']]);
+    }
+
     #[TestDox('Caso 20 en base de datos: el origen que envía el navegador se ignora')]
     public function testCaso20ElOrigenDelClienteSeIgnora(): void
     {
@@ -111,9 +131,11 @@ final class ProgramarVisitaTest extends ServicioTest
     #[TestDox('Caso 14 en base de datos: desplazamiento 20 da CAMPOS y no guarda nada')]
     public function testCaso14DesplazamientoMenorDe30(): void
     {
+        // Partida común: viene de la Obra A (10:00–11:00). Entre obras diferentes el mínimo es 30.
+        $this->insertarVisita();
         $antes = $this->numeroDeVisitas();
 
-        $errores = $this->erroresAlProgramar($this->datos('12:00', 60, ['desplazamiento_min' => 20]));
+        $errores = $this->erroresAlProgramar($this->datos('11:30', 60, ['desplazamiento_min' => 20]));
 
         self::assertSame([[ErrorRegla::CAMPOS, 'El desplazamiento mínimo es 30 min']], $this->reglasYMensajes($errores));
         self::assertSame($antes, $this->numeroDeVisitas());

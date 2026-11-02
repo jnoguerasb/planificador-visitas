@@ -1,4 +1,4 @@
-﻿# Deja la base de desarrollo cargada desde cero: borra el esquema, ejecuta la migración y el seed
+﻿# Deja la base de desarrollo cargada desde cero: borra el esquema, ejecuta todas las migraciones (en orden) y el seed
 # con el usuario propietario (DATABASE_ADMIN_URL) y crea los usuarios demo (DATABASE_URL + DEMO_PASSWORD).
 # Uso: .\scripts\recrear_bd.ps1
 # BORRA TODOS LOS DATOS de la base de desarrollo. No se usa nunca contra producción.
@@ -12,20 +12,16 @@ if ($env:APP_ENV -eq 'production') {
 
 $raiz = Split-Path -Parent $PSScriptRoot
 $admin = Get-ConexionBd 'DATABASE_ADMIN_URL'
-$migracion = Join-Path $raiz 'db\migrations\001_esquema.sql'
+$migraciones = Get-ChildItem (Join-Path $raiz 'db\migrations') -Filter '*.sql' | Sort-Object Name
 $seed = Join-Path $raiz 'db\seed.sql'
 
 Write-Host "Recreando la base $($admin.Base) en $($admin.Servidor):$($admin.Puerto)..."
 
 # Todo en una sola transacción (-1): si algo falla, la base queda como estaba.
-Invoke-Psql $admin @(
-    '-1',
-    '-c', 'SET client_min_messages TO warning',
-    '-c', 'DROP SCHEMA IF EXISTS public CASCADE',
-    '-c', 'CREATE SCHEMA public',
-    '-f', $migracion,
-    '-f', $seed
-) | Out-Null
+$argumentos = @('-1', '-c', 'SET client_min_messages TO warning', '-c', 'DROP SCHEMA IF EXISTS public CASCADE', '-c', 'CREATE SCHEMA public')
+foreach ($migracion in $migraciones) { $argumentos += @('-f', $migracion.FullName) }
+$argumentos += @('-f', $seed)
+Invoke-Psql $admin $argumentos | Out-Null
 
 Write-Host 'Esquema y datos de ejemplo cargados.'
 

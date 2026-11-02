@@ -9,7 +9,9 @@ namespace App;
  *
  * - $visita: la visita validada, con su origen calculado; null si hay errores de CAMPOS.
  * - $anterior / $siguiente: visitas activas inmediatamente antes y después (solo si la hora es válida).
- * - $desplazamientoSiguiente: el que tendrá la siguiente al guardar (el indicado o el que ya tenía).
+ * - $desplazamientoSiguiente: el que tendrá la siguiente al guardar (el indicado o el sugerido).
+ * - $desplazamientoMinimo: mínimo para llegar a la nueva (0 o 30); null si aún no se puede saber.
+ * - $desplazamientoSiguienteSugerido: valor que se propone para la siguiente si no se indica otro.
  */
 final readonly class ResultadoValidacion
 {
@@ -21,6 +23,8 @@ final readonly class ResultadoValidacion
         public ?Visita $siguiente,
         public ?int $desplazamientoSiguiente,
         private bool $origenConocido,
+        public ?int $desplazamientoMinimo = null,
+        public ?int $desplazamientoSiguienteSugerido = null,
     ) {
     }
 

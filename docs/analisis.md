@@ -123,9 +123,9 @@ Todas las reglas se evalúan en el servidor, en una clase PHP pura (`ValidadorVi
 - El campo viene precargado con **30**. En el formulario es numérico con mínimo 30 y máximo 240, así que el navegador ya avisa antes de enviar.
 - El servidor lo valida igualmente, sin fiarse del formulario: si llega vacío, no es un entero o es **menor de 30**, la visita no se guarda y se devuelve el error `CAMPOS` con el mensaje **"El desplazamiento mínimo es 30 min"**. Si es mayor de 240, el error es "El desplazamiento no puede superar 240 min".
 - El formulario muestra el mensaje junto al campo para que el planificador lo corrija y vuelva a guardar.
-- El servidor nunca modifica el valor recibido: lo que se guarda es exactamente lo que se ha validado (entre 30 y 240).
+- El servidor nunca modifica el valor recibido: lo que se guarda es exactamente lo que se ha validado (entre el mínimo que corresponda y 240).
 - El mismo criterio se aplica al campo "desplazamiento hasta la siguiente".
-- En esta versión el mínimo se aplica a todas las visitas, también a las de la misma obra y a las que salen de la sede. Ambos casos están anotados para revisar (sección 10, R1 y R2).
+- **Resuelto el 02/11/2026 según el enunciado (sección 10, R1 y R2):** el mínimo de 30 solo se exige entre visitas a obras diferentes. Desde la sede o en la misma obra el mínimo es 0, así que la primera visita puede empezar a las 08:00. Si se indica un desplazamiento desde la sede, la salida tampoco puede ser antes de las 08:00. El formulario propone el mínimo que corresponda.
 
 ### Las tres comprobaciones
 
@@ -170,7 +170,7 @@ A estas tres se suma la regla c: nuevaInicio ≥ 08:00 y nuevaFin ≤ 17:00.
 
 | Código | Regla | Condición que la incumple | Mensaje de ejemplo |
 | --- | --- | --- | --- |
-| `CAMPOS` | Datos válidos | Falta un campo, formato incorrecto, duración fuera de 15–540, desplazamiento vacío o fuera de 30–240, técnico u obra inexistentes | "El desplazamiento mínimo es 30 min" |
+| `CAMPOS` | Datos válidos | Falta un campo, formato incorrecto, duración fuera de 15–540, desplazamiento vacío, por debajo del mínimo (30 entre obras diferentes; 0 desde la sede o en la misma obra) o mayor de 240, técnico u obra inexistentes | "El desplazamiento mínimo es 30 min" |
 | `PERMISO` | Rol | Un técnico intenta programar, o actuar sobre una visita de otro técnico | "No tienes permiso para modificar esta visita" |
 | `JORNADA` | Regla c | Empieza antes de las 08:00, acaba después de las 17:00, o sale de la sede antes de las 08:00 | "Con 30 min desde la sede, la visita no puede empezar antes de las 08:30" |
 | `SOLAPE` | Regla a | Falla la comprobación 1 | "Solapa con la visita de 10:00 a 11:00 en Obra A" |
@@ -194,8 +194,8 @@ Ana tiene una visita en la Obra A de 10:00 a 11:00, con 30 min de desplazamiento
 | 5 | Obra B, 09:30–09:50 | Llegada desde sede ✔. Salida: 10:00 ≥ 09:50 + 30 = 10:20 ✘ | `DESPLAZAMIENTO`: no da tiempo a llegar a la Obra A |
 | 6 | Obra B, 11:30–12:30, desplazamiento 45 | Llegada: 11:30 ≥ 11:45 ✘ | `DESPLAZAMIENTO`: faltan 15 min |
 | 7 | Obra B, 11:30–12:30, desplazamiento 20 | Validación de campos: 20 < 30 ✘ | CAMPOS: "El desplazamiento mínimo es 30 min"; se corrige en el formulario |
-| 8 | Obra B, 08:00–08:45 | Llegada desde sede: 08:00 − 30 = 07:30 ✘ | `JORNADA` (ver R2) |
-| 9 | Obra A, 11:00–12:00 (misma obra) | Llegada: 11:00 ≥ 11:30 ✘ | `DESPLAZAMIENTO` en esta versión (ver R1) |
+| 8 | Obra B, 08:00–08:45, primera del día | Desde la sede no hay mínimo (R2): con 0 min sale a las 08:00 ✔. Si se indican 30 min: 08:00 − 30 = 07:30 ✘ | Se guarda con 0 min; `JORNADA` si se indican 30 |
+| 9 | Obra A, 11:00–12:00 (misma obra) | En la misma obra no hay mínimo (R1): con 0 min, 11:00 ≥ 11:00 ✔ | Se guarda |
 
 El ejemplo 5 es el caso que justifica la Salida: la nueva visita no tiene ninguna anterior, así que la Llegada la acepta, pero después no da tiempo a llegar a la Obra A.
 
@@ -226,7 +226,7 @@ Cinco tablas: `sede`, `tecnicos`, `obras`, `usuarios` y `visitas`. La visita gua
 | usuarios | tecnico\_id | INT FK → tecnicos, NULL | Obligatorio si el rol es TECNICO |
 | visitas | id, tecnico\_id, obra\_id, fecha, hora\_inicio | Igual que antes |  |
 | visitas | duracion\_min | INT | 15–540 |
-| visitas | desplazamiento\_min | INT DEFAULT 30 | 30–240 (un valor menor se rechaza), minutos para llegar a esta visita |
+| visitas | desplazamiento\_min | INT DEFAULT 30 | 0–240 (migración 002); el validador exige 30 entre obras diferentes. Minutos para llegar a esta visita |
 | visitas | origen\_tipo | VARCHAR(6) | SEDE o VISITA |
 | visitas | origen\_visita\_id | INT FK → visitas, NULL | Visita desde la que sale; NULL si sale de la sede |
 | visitas | revisar\_desplazamiento | BOOLEAN DEFAULT FALSE | Se activa si el origen cambia por una cancelación |
@@ -263,7 +263,7 @@ CREATE TABLE visitas (
   fecha                  DATE NOT NULL,
   hora_inicio            TIME NOT NULL,
   duracion_min           INT  NOT NULL CHECK (duracion_min BETWEEN 15 AND 540),
-  desplazamiento_min     INT  NOT NULL DEFAULT 30 CHECK (desplazamiento_min BETWEEN 30 AND 240),
+  desplazamiento_min     INT  NOT NULL DEFAULT 30 CHECK (desplazamiento_min BETWEEN 0 AND 240),  -- 30–240 hasta la migración 002 (R1 y R2)
   origen_tipo            VARCHAR(6) NOT NULL CHECK (origen_tipo IN ('SEDE', 'VISITA')),
   origen_visita_id       INT NULL REFERENCES visitas(id),
   revisar_desplazamiento BOOLEAN NOT NULL DEFAULT FALSE,
@@ -417,7 +417,7 @@ Se automatizan en PHPUnit contra `ValidadorVisita`, `CalculadoraAgenda` y `Permi
 | 1 | 12:00–13:00, Obra B, despl. 30 | Se guarda | Caso normal |
 | 2 | 10:30–11:30, Obra A | `SOLAPE` | Solape parcial |
 | 3 | 09:00–12:00, Obra B | `SOLAPE` (no además `DESPLAZAMIENTO`) | Un solo error por conflicto |
-| 4 | 11:00–12:00, Obra A | DESPLAZAMIENTO en esta versión (ver R1) | La misma obra también exige 30 min |
+| 4 | 11:00–12:00, Obra A, despl. 0 | Se guarda (R1) | En la misma obra no se exige desplazamiento (enunciado, regla b) |
 | 5 | 11:00–12:00, Obra B | `DESPLAZAMIENTO` | Pegadas en obras distintas |
 | 6 | 11:30–12:00, Obra B, despl. 30 | Se guarda | Exactamente 30 min |
 | 7 | 16:00–17:00, Obra B | Se guarda | Acaba justo a las 17:00 |
@@ -492,9 +492,9 @@ Con las ampliaciones el trabajo sube de unas 3 horas a unas **6 horas**. El orde
 | Duda | Supuesto | Motivo |
 | --- | --- | --- |
 | ¿Pueden tocarse dos visitas? | Sí: intervalos `[inicio, fin)` | Interpretación habitual en agendas |
-| ¿30 min en la misma obra? | En esta versión sí: mínimo de 30 siempre (ver R1) | Aplicación directa del mínimo de 30; más estricta que el enunciado |
+| ¿30 min en la misma obra? | No: en la misma obra el mínimo es 0 (R1, resuelto el 02/11/2026) | El enunciado solo exige 30 min entre obras diferentes |
 | 30 min frente a desplazamiento introducido | Por defecto 30; un valor menor se rechaza y se corrige en el formulario | Premisa de seguridad 11.1; garantiza el mínimo del enunciado |
-| Desplazamiento desde la sede | Cuenta dentro de la jornada: salir no antes de las 08:00, con el mínimo de 30 (ver R2) | El técnico empieza su jornada en la sede |
+| Desplazamiento desde la sede | Sin mínimo (R2, resuelto el 02/11/2026): la primera visita puede empezar a las 08:00. Si se indica un tiempo desde la sede, la salida no puede ser antes de las 08:00 | El enunciado solo exige empezar y acabar dentro de la jornada; el técnico empieza su jornada en la sede |
 | Vuelta a la sede al final | No se valida | No se ha pedido; queda pendiente |
 | Origen del desplazamiento | Lo calcula el servidor, no se elige a mano | Evita incoherencias con la agenda real |
 | Visita intercalada | Se pide el desplazamiento hasta la siguiente y se actualiza esa visita | Mantiene la cadena de orígenes correcta |
@@ -503,19 +503,19 @@ Con las ampliaciones el trabajo sube de unas 3 horas a unas **6 horas**. El orde
 | Completadas | Siguen ocupando su horario | Ocurrieron de verdad |
 | Cancelar | Planificador o técnico dueño, motivo obligatorio para ambos | Trazabilidad uniforme |
 | Estados finales | Completada y Cancelada no se reactivan ni editan | Historial limpio; reprogramar = visita nueva |
-| Duración | 15–540 min; desplazamiento 30–240 min. Mientras siga R2, una visita de 540 min no cabe (máximo real 510): se mantiene 540 como límite del campo | Jornada completa y un máximo razonable; si R2 cambia, 540 vuelve a caber sin tocar nada |
+| Duración | 15–540 min; desplazamiento 0–240 min, con mínimo 30 entre obras diferentes | Jornada completa (desde las 08:00, 540 min caben justos) y un máximo razonable |
 | Fechas pasadas y fines de semana | Se permiten al programar | El enunciado no los restringe |
 | Errores | Se devuelven todos a la vez | Se corrige en un solo intento |
 | Datos maestros | Técnicos, obras, sede y usuarios solo por script | El foco son las reglas y los perfiles |
 
 ### A revisar antes de la versión final
 
-Dos consecuencias del desplazamiento mínimo de 30 que hay que confirmar con negocio. El antiguo R3 (ajuste automático a 30) queda resuelto: un valor menor se rechaza, según la premisa 11.1. Cambiar cualquiera de ellas es pequeño: afecta a la validación del desplazamiento en `ValidadorVisita` y a unos pocos tests.
+**Resueltas el 02/11/2026, antes de la entrega, siguiendo el enunciado** (se aplica la alternativa de cada una; aprobado por el responsable del proyecto). Eran dos consecuencias del desplazamiento mínimo de 30 que había que confirmar con negocio. El antiguo R3 (ajuste automático a 30) queda resuelto: un valor menor se rechaza, según la premisa 11.1. Cambiar cualquiera de ellas es pequeño: afecta a la validación del desplazamiento en `ValidadorVisita` y a unos pocos tests.
 
 | Id | Punto | Comportamiento en esta versión | Por qué revisarlo | Alternativa | Afecta a |
 | --- | --- | --- | --- | --- | --- |
-| R1 | Visitas seguidas en la **misma obra** | Exigen 30 min entre ellas | El enunciado solo exige los 30 min entre obras diferentes. Esta versión es más estricta y rechaza casos que el enunciado permite; un evaluador puede probarlo | Si la visita anterior o la siguiente es en la misma obra, desplazamiento 0 | Sección 4 ejemplo 9; test 4 |
-| R2 | Primera visita del día, **desde la sede** | Mínimo 30 min: ninguna visita puede empezar antes de las 08:30 | Una obra cercana a la sede podría necesitar menos tiempo y perder media hora de jornada cada día. Además, con este mínimo una visita de 540 min (la duración máxima) nunca cabe: el máximo real es 510 | Permitir desde la sede un valor menor (0–29) sin ajuste, o un tiempo fijo por obra | Sección 4 ejemplo 8; tests 15 y 16; duración máxima útil |
+| R1 | Visitas seguidas en la **misma obra** | **Resuelto:** mínimo 0 en la misma obra (antes exigían 30 min) | El enunciado solo exige los 30 min entre obras diferentes. Esta versión es más estricta y rechaza casos que el enunciado permite; un evaluador puede probarlo | Si la visita anterior o la siguiente es en la misma obra, desplazamiento 0 | Sección 4 ejemplo 9; test 4 |
+| R2 | Primera visita del día, **desde la sede** | **Resuelto:** sin mínimo desde la sede; se puede empezar a las 08:00 (antes, nada antes de las 08:30) | Una obra cercana a la sede podría necesitar menos tiempo y perder media hora de jornada cada día. Además, con este mínimo una visita de 540 min (la duración máxima) nunca cabe: el máximo real es 510 | Permitir desde la sede un valor menor (0–29) sin ajuste, o un tiempo fijo por obra | Sección 4 ejemplo 8; tests 15 y 16; duración máxima útil |
 
 ### La agenda ya no es opcional
 
@@ -622,7 +622,7 @@ Las siguientes premisas deberán aplicarse a todo el código generado o modifica
 
 | Premisa | Cómo se aplica | Cómo se verifica |
 | --- | --- | --- |
-| 11.1 Entradas | `ValidadorVisita` y una clase `Entrada` comprueban en servidor: ids enteros con `filter_var`, fecha `Y-m-d` estricta con `DateTime::createFromFormat`, hora `HH:MM` por expresión regular, duración 15–540, desplazamiento 30–240 (por debajo, "El desplazamiento mínimo es 30 min"), comentario 10–2.000 caracteres, motivo 5–2.000, estado y rol por lista blanca. Cualquier campo no esperado en el JSON se rechaza | Tests de `CAMPOS` y prueba con `curl` saltándose el formulario |
+| 11.1 Entradas | `ValidadorVisita` y una clase `Entrada` comprueban en servidor: ids enteros con `filter_var`, fecha `Y-m-d` estricta con `DateTime::createFromFormat`, hora `HH:MM` por expresión regular, duración 15–540, desplazamiento 0–240 con mínimo 30 entre obras diferentes (por debajo, "El desplazamiento mínimo es 30 min"), comentario 10–2.000 caracteres, motivo 5–2.000, estado y rol por lista blanca. Cualquier campo no esperado en el JSON se rechaza | Tests de `CAMPOS` y prueba con `curl` saltándose el formulario |
 | 11.2 Base de datos | Solo PDO con sentencias preparadas y `PDO::ATTR_EMULATE_PREPARES = false`. El usuario de la aplicación solo tiene `SELECT`, `INSERT` y `UPDATE` sobre las tablas; sin `DELETE` (nada se borra) ni permisos de esquema. Las migraciones se ejecutan con otro usuario | Revisión: búsqueda de concatenaciones en SQL (`grep`); `GRANT` documentado en `001_esquema.sql` |
 | 11.3 XSS | Todo dato se pinta con `textContent` y `createElement`; nunca `innerHTML` con datos ni `eval()`. Cabecera `Content-Security-Policy: default-src 'self'` como segunda barrera | Completar una visita con `<script>` en el comentario y comprobar que se ve como texto |
 | 11.4 CSRF | Token `bin2hex(random_bytes(32))` generado al iniciar sesión, guardado en la sesión, enviado en la cabecera `X-CSRF-Token` y comparado con `hash_equals`. Aplica a todos los POST salvo el login (excepción de 11.4, compensada con `Content-Type: application/json` obligatorio, rechazo de `Origin` ajeno y `SameSite=Strict`). Ningún GET cambia datos | Test 30: POST sin token devuelve 403; login con `Origin` ajeno devuelve 403 |
